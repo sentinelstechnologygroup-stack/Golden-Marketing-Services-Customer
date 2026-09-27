@@ -9,6 +9,7 @@ import { TableSkeleton } from "@/components/portal/Skeleton";
 import ErrorState from "@/components/portal/ErrorState";
 import EmptyState from "@/components/portal/EmptyState";
 import { fmtDateTime, relativeTime } from "@/lib/portalUtils";
+import { derivePortalLifecycle, lifecycleLabel, verificationState } from "@/lib/leadLifecycle";
 
 const PAGE_SIZE = 8;
 
@@ -60,7 +61,7 @@ export default function Leads() {
     <div>
       <PageHeader
         title="Lead Activity"
-        description="Every lead from first response through qualification, handoff, and final disposition."
+        description="Every opportunity from inquiry through verification, qualification, handoff, acceptance, and client outcome."
         actions={<>
           <GhostButton onClick={exportCsv}><Download className="w-4 h-4" /> Export CSV</GhostButton>
           <PrimaryButton onClick={() => setShowFilters((s) => !s)}><SlidersHorizontal className="w-4 h-4" /> Filters</PrimaryButton>
@@ -129,7 +130,10 @@ export default function Leads() {
                   </tr>
                 </thead>
                 <tbody>
-                  {pageRows.map((l) => (
+                  {pageRows.map((l) => {
+                    const lifecycle = derivePortalLifecycle(l);
+                    const verification = verificationState(l);
+                    return (
                     <tr key={l.id} className="border-b last:border-0 hover:bg-[var(--cream)]" style={{ borderColor: "var(--line-2)" }}>
                       <td className="px-4 py-3">
                         <div className="font-semibold" style={{ color: "var(--shell)" }}>{l.name}</div>
@@ -141,13 +145,17 @@ export default function Leads() {
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap">{fmtDateTime(l.received)}</td>
                       <td className="px-4 py-3 whitespace-nowrap">{l.firstResponseMinutes != null ? `${l.firstResponseMinutes} min` : "—"}</td>
-                      <td className="px-4 py-3"><Badge tone={stageTone(l.stage)}>{l.stage}</Badge></td>
-                      <td className="px-4 py-3">{l.qualification}</td>
+                      <td className="px-4 py-3"><Badge tone={stageTone(lifecycleLabel(lifecycle))}>{lifecycleLabel(lifecycle)}</Badge></td>
+                      <td className="px-4 py-3">
+                        <div>{l.qualification}</div>
+                        <div className="text-[11px] mt-0.5" style={{ color: verification.key === "verified" ? "var(--success)" : "var(--muted-ink)" }}>{verification.label}</div>
+                      </td>
                       <td className="px-4 py-3">{l.handoffType || "—"}</td>
                       <td className="px-4 py-3">{l.rep}</td>
                       <td className="px-4 py-3"><Link to={`/leads/${l.id}`} className="inline-flex items-center gap-1 text-[12px] font-medium hover:underline" style={{ color: "var(--teal)" }}>View <ArrowRight className="w-3.5 h-3.5" /></Link></td>
                     </tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -155,23 +163,28 @@ export default function Leads() {
 
           {/* Mobile cards */}
           <div className="lg:hidden space-y-3">
-            {pageRows.map((l) => (
+            {pageRows.map((l) => {
+              const lifecycle = derivePortalLifecycle(l);
+              const verification = verificationState(l);
+              return (
               <Link key={l.id} to={`/leads/${l.id}`} className="portal-card p-4 block focus-ring">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <div className="font-display text-[16px] font-semibold" style={{ color: "var(--shell)" }}>{l.name}</div>
                     <div className="text-[12px]" style={{ color: "var(--muted-ink)" }}>{l.source} · {l.campaign}</div>
                   </div>
-                  <Badge tone={stageTone(l.stage)}>{l.stage}</Badge>
+                  <Badge tone={stageTone(lifecycleLabel(lifecycle))}>{lifecycleLabel(lifecycle)}</Badge>
                 </div>
                 <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-1.5 text-[12px]">
                   <div><dt className="inline" style={{ color: "var(--muted-ink)" }}>Received: </dt><dd className="inline" style={{ color: "var(--ink-2)" }}>{relativeTime(l.received)}</dd></div>
                   <div><dt className="inline" style={{ color: "var(--muted-ink)" }}>Response: </dt><dd className="inline" style={{ color: "var(--ink-2)" }}>{l.firstResponseMinutes != null ? `${l.firstResponseMinutes} min` : "—"}</dd></div>
                   <div><dt className="inline" style={{ color: "var(--muted-ink)" }}>Qualification: </dt><dd className="inline" style={{ color: "var(--ink-2)" }}>{l.qualification}</dd></div>
+                  <div><dt className="inline" style={{ color: "var(--muted-ink)" }}>Verification: </dt><dd className="inline" style={{ color: verification.key === "verified" ? "var(--success)" : "var(--ink-2)" }}>{verification.label}</dd></div>
                   <div><dt className="inline" style={{ color: "var(--muted-ink)" }}>Rep: </dt><dd className="inline" style={{ color: "var(--ink-2)" }}>{l.rep}</dd></div>
                 </dl>
               </Link>
-            ))}
+              );
+            })}
           </div>
 
           {/* Pagination */}
