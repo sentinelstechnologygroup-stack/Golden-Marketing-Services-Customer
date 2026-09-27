@@ -14,7 +14,9 @@
 //   POST   /auth/recovery/complete    { token, password }
 //   GET    /dashboard
 //   GET    /leads                    ?search&source&campaign&service&stage&...
-//   GET    /leads/:id
+//   GET    /leads/:id              includes lifecycleStage, verificationStatus,
+//                                  handoffStatus, handoffEvidence, intentScore,
+//                                  consentRecorded, qualification and acceptance evidence
 //   GET    /appointments
 //   GET    /reports                  ?range&compare
 //   GET    /billing
