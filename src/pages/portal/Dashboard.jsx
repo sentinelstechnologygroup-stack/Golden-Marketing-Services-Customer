@@ -12,6 +12,7 @@ import { CardSkeleton } from "@/components/portal/Skeleton";
 import ErrorState from "@/components/portal/ErrorState";
 import EmptyState from "@/components/portal/EmptyState";
 import { fmtDateTime, fmtTime, relativeTime, pct } from "@/lib/portalUtils";
+import { LMS_LIFECYCLE } from "@/lib/leadLifecycle";
 
 export default function Dashboard() {
   const { session } = usePortalAuth();
@@ -47,7 +48,7 @@ export default function Dashboard() {
 
       {/* KPI grid */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        <StatCard label="Leads received" value={m.leadsReceived.value} change={m.leadsReceived.change} />
+        <StatCard label="Inquiries received" value={m.leadsReceived.value} change={m.leadsReceived.change} />
         <StatCard label="Conversations completed" value={m.conversations.value} change={m.conversations.change} />
         <StatCard label="Qualified opportunities" value={m.qualifiedOpportunities.value} change={m.qualifiedOpportunities.change} />
         <StatCard label="Appointments & transfers" value={m.appointmentsAndTransfers.value} change={m.appointmentsAndTransfers.change} />
@@ -97,6 +98,21 @@ export default function Dashboard() {
         </SectionCard>
         <SectionCard title="Lead sources" subtitle="This period">
           <SourceBarChart data={data.sources} />
+        </SectionCard>
+      </div>
+
+      {/* Qualification gate */}
+      <div className="mt-4">
+        <SectionCard title="LMS Qualification Gate" subtitle="The controlled lifecycle behind every documented handoff">
+          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2">
+            {LMS_LIFECYCLE.map((stage, i) => (
+              <div key={stage.key} className="rounded-lg border p-3 min-h-[82px]" style={{ borderColor: "var(--line-2)", background: i >= 4 ? "var(--gold-soft)" : "var(--offwhite)" }}>
+                <div className="text-[10px] font-semibold" style={{ color: "var(--muted-ink)" }}>{String(i + 1).padStart(2, "0")}</div>
+                <div className="mt-1 text-[12px] font-semibold leading-4" style={{ color: "var(--shell)" }}>{stage.label}</div>
+              </div>
+            ))}
+          </div>
+          <p className="mt-3 text-[12px]" style={{ color: "var(--muted-ink)" }}>A form submission is an inquiry. Verification, qualification, documented contact, and handoff evidence determine when it advances.</p>
         </SectionCard>
       </div>
 
