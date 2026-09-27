@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { ArrowLeft, Phone, Mail, MapPin, Clock, User, FileText, CheckCircle2, XCircle, CalendarClock, Headset } from "lucide-react";
+import { ArrowLeft, Phone, Mail, MapPin, Clock, User, FileText, CheckCircle2, XCircle, CalendarClock, Headset, ShieldCheck, ReceiptText, Activity } from "lucide-react";
 import portalAdapter from "@/services/portalAdapter";
 import { usePortalData } from "@/lib/usePortalData";
 import Badge, { stageTone } from "@/components/portal/Badge";
@@ -9,6 +9,7 @@ import { Skeleton } from "@/components/portal/Skeleton";
 import ErrorState from "@/components/portal/ErrorState";
 import EmptyState from "@/components/portal/EmptyState";
 import { fmtDateTime, fmtTime } from "@/lib/portalUtils";
+import { derivePortalLifecycle, lifecycleLabel, verificationState } from "@/lib/leadLifecycle";
 
 function Collapsible({ title, children, defaultOpen = true }) {
   const [open, setOpen] = useState(defaultOpen);
@@ -30,6 +31,12 @@ export default function LeadDetail() {
   if (loading) return <div className="space-y-4"><Skeleton className="h-10 w-40" /><Skeleton className="h-48 w-full" /><Skeleton className="h-48 w-full" /></div>;
   if (error) return <ErrorState error={error} onRetry={retry} />;
   if (!lead) return <EmptyState title="Lead not found" description="This lead may have been removed or you may not have access." action={<Link to="/leads" className="text-[13px] font-medium hover:underline" style={{ color: "var(--teal)" }}>Back to leads</Link>} />;
+
+  const lifecycle = derivePortalLifecycle(lead);
+  const verification = verificationState(lead);
+  const consentRecorded = lead.consentRecorded ?? lead.consent_recorded;
+  const handoffEvidence = lead.handoffEvidence || lead.handoff_evidence || null;
+  const handoffStatus = lead.handoffStatus || lead.handoff_status || (lead.customerAcceptance === "Accepted" ? "accepted" : lead.handoffType || "Not ready");
 
   return (
     <div>
@@ -78,6 +85,27 @@ export default function LeadDetail() {
                 </li>
               ))}
             </ol>
+          </SectionCard>
+
+          <SectionCard title="LMS Qualification Receipt" subtitle="Evidence-backed checkpoints for this opportunity">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <ReceiptRow icon={ShieldCheck} label="Lifecycle stage" value={lifecycleLabel(lifecycle)} />
+              <ReceiptRow icon={CheckCircle2} label="Identity / mobile" value={verification.label} good={verification.key === "verified"} />
+              <ReceiptRow icon={FileText} label="Consent record" value={consentRecorded === true ? "Recorded" : consentRecorded === false ? "Not recorded" : "Not available"} good={consentRecorded === true} />
+              <ReceiptRow icon={CheckCircle2} label="Qualification" value={lead.qualification || "In progress"} good={String(lead.qualification || "").toLowerCase() === "qualified"} />
+              <ReceiptRow icon={Headset} label="Handoff" value={String(handoffStatus).replace(/_/g, " ")} good={["accepted","completed"].includes(String(handoffStatus).toLowerCase())} />
+              <ReceiptRow icon={User} label="Customer acceptance" value={lead.customerAcceptance || "Pending"} good={lead.customerAcceptance === "Accepted"} />
+              <ReceiptRow icon={Activity} label="Intent score" value={lead.intentScore ?? lead.intent_score ?? "Not available"} />
+              <ReceiptRow icon={ReceiptText} label="Billing eligibility" value={lead.billingEligible ? "Eligible" : "Not eligible"} good={lead.billingEligible === true} />
+            </div>
+            {handoffEvidence ? (
+              <div className="mt-4 rounded-lg border p-3 text-[12.5px]" style={{ borderColor: "var(--line-2)", background: "var(--offwhite)" }}>
+                <div className="font-semibold mb-2" style={{ color: "var(--shell)" }}>Recorded handoff evidence</div>
+                <pre className="whitespace-pre-wrap font-sans leading-5" style={{ color: "var(--ink-2)" }}>{JSON.stringify(handoffEvidence, null, 2)}</pre>
+              </div>
+            ) : (
+              <p className="mt-4 text-[12.5px]" style={{ color: "var(--muted-ink)" }}>No structured handoff-evidence package has been attached yet. Timeline, qualification, transfer, and acceptance records remain visible below.</p>
+            )}
           </SectionCard>
 
           {/* Qualification */}
@@ -149,6 +177,18 @@ export default function LeadDetail() {
             <p className="text-[13px] leading-relaxed" style={{ color: "var(--ink-2)" }}>{lead.notes || "No notes recorded."}</p>
           </SectionCard>
         </div>
+      </div>
+    </div>
+  );
+}
+
+function ReceiptRow({ icon: Icon, label, value, good = false }) {
+  return (
+    <div className="flex items-start gap-2.5 p-3 rounded-lg border" style={{ borderColor: "var(--line-2)", background: "var(--offwhite)" }}>
+      <Icon className="w-4 h-4 mt-0.5 shrink-0" style={{ color: good ? "var(--success)" : "var(--teal)" }} />
+      <div>
+        <div className="text-[11px]" style={{ color: "var(--muted-ink)" }}>{label}</div>
+        <div className="text-[13px] font-semibold capitalize" style={{ color: good ? "var(--success)" : "var(--shell)" }}>{String(value ?? "—")}</div>
       </div>
     </div>
   );
