@@ -135,20 +135,47 @@ const asIso = (value) => {
   if (value instanceof Date) return value.toISOString();
   return String(value);
 };
-const normalizeLeadRow = (row) => ({
-  ...row,
-  name: row.name || [row.firstName, row.lastName].filter(Boolean).join(" ") || row.email || "Unnamed lead",
-  source: row.source || row.sourceName || row.sourceId || "—",
-  campaign: row.campaign || row.campaignName || row.campaignId || "—",
-  service: row.service || row.serviceName || row.industry || row.industryId || "—",
-  location: row.location || row.market || row.city || "—",
-  stage: row.stage || row.status || "New",
-  qualification: row.qualification || row.qualificationStatus || "In progress",
-  handoffType: row.handoffType || row.handoff || "None",
-  disposition: row.disposition || "Open",
-  received: asIso(row.received || row.receivedAt || row.createdAt),
-  rep: row.rep || row.assignedToName || row.assignedTo || "Unassigned",
-});
+const normalizeLeadRow = (row) => {
+  const qualificationData = row.qualificationAnswers || row.qualification_data || [];
+  const qualificationAnswers = Array.isArray(qualificationData)
+    ? qualificationData
+    : Object.entries(qualificationData || {}).map(([q, a]) => ({ q, a: typeof a === "object" ? JSON.stringify(a) : String(a ?? "") }));
+  const acceptanceRaw = row.customerAcceptance || row.owner_acceptance_status || row.ownerAcceptanceStatus || "Pending";
+  const customerAcceptance = String(acceptanceRaw).replace(/_/g, " ").replace(/\b\w/g, (char) => char.toUpperCase());
+
+  return {
+    ...row,
+    name: row.name || [row.firstName || row.first_name, row.lastName || row.last_name].filter(Boolean).join(" ") || row.email || "Unnamed lead",
+    source: row.source || row.sourceName || row.sourceId || row.lead_source_id || "—",
+    campaign: row.campaign || row.campaignName || row.campaignId || row.campaign_id || "—",
+    service: row.service || row.serviceName || row.industry || row.industryId || "—",
+    location: row.location || row.market || row.city || "—",
+    stage: row.stage || row.lifecycleStage || row.lifecycle_stage || row.status || row.lead_status || "New",
+    lifecycleStage: row.lifecycleStage || row.lifecycle_stage || null,
+    verificationStatus: row.verificationStatus || row.verification_status || (row.phoneVerified === true ? "verified" : "pending"),
+    verifiedAt: asIso(row.verifiedAt || row.verified_at),
+    qualification: row.qualification || row.qualificationStatus || row.qualification_status || "In progress",
+    qualificationAnswers,
+    score: row.score ?? row.qualificationScore ?? row.qualification_score ?? null,
+    handoffType: row.handoffType || row.handoff || "None",
+    handoffStatus: row.handoffStatus || row.handoff_status || "not_ready",
+    handoffEvidence: row.handoffEvidence || row.handoff_evidence || null,
+    handoffAcceptedAt: asIso(row.handoffAcceptedAt || row.handoff_accepted_at),
+    intentScore: row.intentScore ?? row.intent_score ?? null,
+    intentConflict: row.intentConflict ?? row.intent_conflict ?? false,
+    declaredIntent: row.declaredIntent || row.declared_intent || null,
+    observedIntent: row.observedIntent || row.observed_intent || null,
+    consentRecorded: row.consentRecorded ?? row.consent_recorded ?? null,
+    customerAcceptance,
+    billingEligible: row.billingEligible ?? row.billing_eligible ?? false,
+    disposition: row.disposition || row.closed_outcome || "Open",
+    received: asIso(row.received || row.receivedAt || row.createdAt || row.created_date),
+    rep: row.rep || row.assignedToName || row.assignedTo || row.assigned_agent_id || "Unassigned",
+    outreachAttempts: row.outreachAttempts ?? row.contact_attempts ?? 0,
+    timeline: Array.isArray(row.timeline) ? row.timeline : [],
+    events: Array.isArray(row.events) ? row.events : [],
+  };
+};
 const normalizeAppointmentRow = (row) => {
   const status = String(row.attendance || row.status || "upcoming").toLowerCase();
   return { ...row, prospect: row.prospect || row.leadName || row.title || "Appointment", when: asIso(row.when || row.scheduledStart || row.startAt), type: row.type || row.title || "Appointment", salesperson: row.salesperson || row.assignedToName || row.assignedTo || "Unassigned", confirmation: row.confirmation || (status === "confirmed" ? "Confirmed" : "Pending"), attendance: row.attendance || (['completed', 'show', 'no-show', 'cancelled', 'canceled'].includes(status) ? (status === 'completed' ? 'Show' : status === 'no-show' ? 'No-show' : status) : 'Upcoming'), acceptance: row.acceptance || "Pending", reschedule: row.reschedule || "None" };
