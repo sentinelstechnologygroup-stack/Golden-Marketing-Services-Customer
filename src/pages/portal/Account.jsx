@@ -67,7 +67,7 @@ export default function Account() {
           <dl className="space-y-2.5 text-[13px]">
             <Field label="Primary market" value={data.primaryMarket} />
             <Field label="Account owner" value={data.accountOwner} />
-            <Field label="Link program manager" value={data.programManager} />
+            <Field label="GMS program manager" value={data.programManager} />
           </dl>
         </SectionCard>
         <SectionCard title="Billing & notification contacts">

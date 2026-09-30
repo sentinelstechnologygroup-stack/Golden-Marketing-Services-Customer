@@ -112,7 +112,7 @@ export default function SignIn() {
 
           {portalAdapter.isPreviewMode && (
             <div className="mt-4 text-[12px] px-3 py-2 rounded-lg border" style={{ background: "var(--gold-soft)", borderColor: "var(--gold)", color: "var(--shell)" }}>
-              Interface preview — no real authentication is performed. Sample program data is shown after sign-in.
+              GMS preview workspace — no real authentication is performed. Sample program data is shown after sign-in.
             </div>
           )}
 

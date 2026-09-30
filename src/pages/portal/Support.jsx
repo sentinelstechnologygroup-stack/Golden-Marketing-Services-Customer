@@ -105,7 +105,7 @@ function NewRequestForm({ onClose, onCreated }) {
     setSubmitting(true);
     try {
       const res = await portalAdapter.createSupport({ type, subject, priority, body });
-      onCreated({ id: res.id, type, subject, priority, status: "Open", assigned: "Queued — Link team", created: new Date().toISOString().slice(0, 10), updated: new Date().toISOString().slice(0, 10), thread: [{ at: new Date().toISOString(), from: "Alex Morgan", body }], resolution: null });
+      onCreated({ id: res.id, type, subject, priority, status: "Open", assigned: "Queued — GMS team", created: new Date().toISOString().slice(0, 10), updated: new Date().toISOString().slice(0, 10), thread: [{ at: new Date().toISOString(), from: "Alex Morgan", body }], resolution: null });
     } finally { setSubmitting(false); }
   };
 

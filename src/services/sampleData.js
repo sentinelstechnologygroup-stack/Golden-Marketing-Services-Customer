@@ -405,8 +405,8 @@ export const sampleDocuments = [
   { id: "doc_02", name: "Approved Call Script — HVAC Install", category: "Approved scripts", size: 64200, uploaded: "2026-03-10", updated: "2026-06-02", uploadedBy: "Danielle Reyes", version: "2.1", access: "Owner, Administrator, Manager" },
   { id: "doc_03", name: "Qualification Criteria — Roofing", category: "Qualification criteria", size: 38900, uploaded: "2026-03-12", updated: "2026-07-18", uploadedBy: "Alex Morgan", version: "1.3", access: "Owner, Administrator" },
   { id: "doc_04", name: "Routing & Calendar Instructions", category: "Routing instructions", size: 51200, uploaded: "2026-03-15", updated: "2026-08-01", uploadedBy: "Danielle Reyes", version: "1.4", access: "Owner, Administrator, Manager" },
-  { id: "doc_05", name: "Program Performance — August 2026", category: "Performance reports", size: 184000, uploaded: "2026-09-02", updated: "2026-09-02", uploadedBy: "Link Reporting", version: "1.0", access: "Owner, Administrator, Manager, Billing, Viewer" },
-  { id: "doc_06", name: "Invoice NS-2026-08", category: "Invoices", size: 96000, uploaded: "2026-09-01", updated: "2026-09-01", uploadedBy: "Link Billing", version: "1.0", access: "Owner, Administrator, Billing" },
+  { id: "doc_05", name: "Program Performance — August 2026", category: "Performance reports", size: 184000, uploaded: "2026-09-02", updated: "2026-09-02", uploadedBy: "GMS Reporting", version: "1.0", access: "Owner, Administrator, Manager, Billing, Viewer" },
+  { id: "doc_06", name: "Invoice NS-2026-08", category: "Invoices", size: 96000, uploaded: "2026-09-01", updated: "2026-09-01", uploadedBy: "GMS Billing", version: "1.0", access: "Owner, Administrator, Billing" },
   { id: "doc_07", name: "Data Processing & Compliance Addendum", category: "Compliance documents", size: 132000, uploaded: "2026-03-04", updated: "2026-03-04", uploadedBy: "Danielle Reyes", version: "1.0", access: "Owner, Administrator" },
   { id: "doc_08", name: "Northstar Brand Guidelines (uploaded)", category: "Customer-uploaded files", size: 512000, uploaded: "2026-05-20", updated: "2026-05-20", uploadedBy: "Alex Morgan", version: "1.0", access: "Owner, Administrator" },
 ];
@@ -421,9 +421,9 @@ export const sampleSupport = {
       { at: "2026-08-28T11:00:00Z", from: "Alex Morgan", body: "Add financing mention to HVAC script intro." },
       { at: "2026-09-02T14:00:00Z", from: "Danielle Reyes", body: "Script v2.1 published with financing line." },
     ], resolution: "Script updated and approved — v2.1 live." },
-    { id: "sr_012", type: "Billing question", subject: "Question on NS-2026-08 line items", priority: "Normal", status: "Resolved", assigned: "Link Billing", created: "2026-09-03", updated: "2026-09-06", thread: [
+    { id: "sr_012", type: "Billing question", subject: "Question on NS-2026-08 line items", priority: "Normal", status: "Resolved", assigned: "GMS Billing", created: "2026-09-03", updated: "2026-09-06", thread: [
       { at: "2026-09-03T10:00:00Z", from: "Alex Morgan", body: "Two leads look duplicated on the August invoice." },
-      { at: "2026-09-06T12:00:00Z", from: "Link Billing", body: "Reviewed — one was a duplicate, $95 credit applied." },
+      { at: "2026-09-06T12:00:00Z", from: "GMS Billing", body: "Reviewed — one was a duplicate, $95 credit applied." },
     ], resolution: "Credit of $95 applied to next invoice." },
   ],
 };

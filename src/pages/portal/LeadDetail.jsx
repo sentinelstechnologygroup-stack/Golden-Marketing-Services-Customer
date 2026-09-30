@@ -164,7 +164,7 @@ export default function LeadDetail() {
         <div className="space-y-4">
           <SectionCard title="Outcome">
             <dl className="space-y-2.5 text-[13px]">
-              <Row label="Assigned Link rep" value={lead.rep} icon={User} />
+              <Row label="Assigned GMS representative" value={lead.rep} icon={User} />
               <Row label="Sales-team recipient" value={lead.salesRecipient || "—"} icon={User} />
               <Row label="Customer acceptance" value={lead.customerAcceptance} icon={lead.customerAcceptance === "Accepted" ? CheckCircle2 : lead.customerAcceptance === "Refused" ? XCircle : FileText} />
               <Row label="Final disposition" value={lead.disposition} icon={FileText} />

@@ -118,7 +118,7 @@ export default function Security() {
           </ul>
           <div className="mt-4 pt-3 border-t flex flex-wrap gap-2" style={{ borderColor: "var(--line-2)" }}>
             <GhostButton onClick={() => alert("Password change requires recent authentication. (preview)")}><KeyRound className="w-4 h-4" /> Change password</GhostButton>
-            <GhostButton onClick={() => alert("Report suspicious activity to the Link security team. (preview)")}><AlertTriangle className="w-4 h-4" /> Report suspicious activity</GhostButton>
+            <GhostButton onClick={() => alert("Report suspicious activity to the GMS security team. (preview)")}><AlertTriangle className="w-4 h-4" /> Report suspicious activity</GhostButton>
           </div>
         </SectionCard>
       </div>
