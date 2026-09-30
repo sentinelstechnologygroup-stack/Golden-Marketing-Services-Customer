@@ -1,4 +1,4 @@
-// Centralized sample data for the Link Marketing Services customer portal.
+// Centralized sample data for the Golden Marketing Services customer portal.
 // This module is ONLY used when VITE_CUSTOMER_PORTAL_API_URL is not configured.
 // Every shape here mirrors the production adapter contract so the UI is unchanged
 // when the real API is connected.
@@ -18,7 +18,7 @@ export const sampleSession = {
     reportingPeriod: "Sep 1 – Sep 12, 2026",
     market: "Greater Denver Metro & Front Range",
     owner: "Alex Morgan",
-    programManager: "Danielle Reyes — Link Marketing Services",
+    programManager: "Danielle Reyes — Golden Marketing Services",
     since: "March 2024",
   },
 };

@@ -26,18 +26,18 @@
     --ring: 0 0% 3.9%;
     --radius: 0.5rem;
 
-    /* Link Marketing Services portal palette */
-    --shell: #001922;
-    --shell-2: #032832;
-    --shell-3: #073640;
-    --shell-line: #164955;
-    --teal: #14857F;
-    --teal-2: #0D6E68;
-    --teal-soft: #E2EFEC;
-    --gold: #C9A24B;
-    --gold-2: #B8923A;
-    --gold-soft: #F3E9CF;
-    --cream: #F7F1E6;
+    /* Golden Marketing Services portal palette */
+    --shell: #0B1F33;
+    --shell-2: #0F4D5B;
+    --shell-3: #146B78;
+    --shell-line: #2C6F7B;
+    --teal: #0F4D5B;
+    --teal-2: #0B3C49;
+    --teal-soft: #DDEEF0;
+    --gold: #D4AF37;
+    --gold-2: #B98F1F;
+    --gold-soft: #F4E8BC;
+    --cream: #F8F6EF;
     --offwhite: #FBFAF7;
     --surface: #FFFFFF;
     --ink: #1B2A2C;
@@ -45,9 +45,9 @@
     --muted-ink: #5A6B6D;
     --line: #E6DFD2;
     --line-2: #EFEAE0;
-    --danger: #B4452F;
-    --success: #2E7D5B;
-    --warn: #B07A1E;
+    --danger: #EF4444;
+    --success: #10B981;
+    --warn: #F59E0B;
 
     --font-heading: "Fraunces", ui-serif, Georgia, "Times New Roman", serif;
     --font-body: "Inter", ui-sans-serif, system-ui, sans-serif;

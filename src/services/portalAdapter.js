@@ -1,4 +1,4 @@
-// Link Marketing Services — Customer Portal Service Adapter
+// Golden Marketing Services — Customer Portal Service Adapter
 // ----------------------------------------------------------------------------
 // This is the ONLY layer that talks to a backend. Every page and component
 // imports from here; nothing in the portal calls Base44 or any data source

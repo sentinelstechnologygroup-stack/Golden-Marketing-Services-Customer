@@ -91,7 +91,7 @@ export default function SignIn() {
         </div>
 
         <div className="mt-10 lg:mt-12 text-[11.5px]" style={{ color: "#7FA09D" }}>
-          © {new Date().getFullYear()} Link Marketing Services. All rights reserved.
+          © {new Date().getFullYear()} Golden Marketing Services. All rights reserved.
         </div>
       </div>
 
