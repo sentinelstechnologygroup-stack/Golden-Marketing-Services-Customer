@@ -7,14 +7,24 @@ import { getStorage, connectStorageEmulator } from "firebase/storage";
 
 const required = ["apiKey", "authDomain", "projectId", "appId"];
 const env = (key) => import.meta.env?.[key] || "";
+// Public Firebase web configuration for the existing production backend.
+// Vercel variables still override these values when configured.
+const DEFAULT_FIREBASE_CONFIG = {
+  apiKey: "AIzaSyAHNMYWtu7RkVe0apq94oB271_sXvIIWXE",
+  authDomain: "linkmarketing-agent-portal-crm.firebaseapp.com",
+  projectId: "linkmarketing-agent-portal-crm",
+  storageBucket: "linkmarketing-agent-portal-crm.firebasestorage.app",
+  messagingSenderId: "1089114348316",
+  appId: "1:1089114348316:web:6d1cf9944ca6ef1cc778d9",
+};
 
 export const firebaseConfig = {
-  apiKey: env("VITE_FIREBASE_CUSTOMER_PORTAL_API_KEY"),
-  authDomain: env("VITE_FIREBASE_CUSTOMER_PORTAL_AUTH_DOMAIN"),
-  projectId: env("VITE_FIREBASE_CUSTOMER_PORTAL_PROJECT_ID"),
-  storageBucket: env("VITE_FIREBASE_CUSTOMER_PORTAL_STORAGE_BUCKET"),
-  messagingSenderId: env("VITE_FIREBASE_CUSTOMER_PORTAL_MESSAGING_SENDER_ID"),
-  appId: env("VITE_FIREBASE_CUSTOMER_PORTAL_APP_ID"),
+  apiKey: env("VITE_FIREBASE_CUSTOMER_PORTAL_API_KEY") || DEFAULT_FIREBASE_CONFIG.apiKey,
+  authDomain: env("VITE_FIREBASE_CUSTOMER_PORTAL_AUTH_DOMAIN") || DEFAULT_FIREBASE_CONFIG.authDomain,
+  projectId: env("VITE_FIREBASE_CUSTOMER_PORTAL_PROJECT_ID") || DEFAULT_FIREBASE_CONFIG.projectId,
+  storageBucket: env("VITE_FIREBASE_CUSTOMER_PORTAL_STORAGE_BUCKET") || DEFAULT_FIREBASE_CONFIG.storageBucket,
+  messagingSenderId: env("VITE_FIREBASE_CUSTOMER_PORTAL_MESSAGING_SENDER_ID") || DEFAULT_FIREBASE_CONFIG.messagingSenderId,
+  appId: env("VITE_FIREBASE_CUSTOMER_PORTAL_APP_ID") || DEFAULT_FIREBASE_CONFIG.appId,
 };
 
 export const firebaseConfigured = required.every((key) => Boolean(firebaseConfig[key]));
