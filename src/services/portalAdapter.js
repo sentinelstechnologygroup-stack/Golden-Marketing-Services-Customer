@@ -49,10 +49,12 @@ import { collection, doc, getDoc, getDocs, limit, query, where } from "firebase/
 import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
 
 const API_URL = (import.meta.env && import.meta.env.VITE_CUSTOMER_PORTAL_API_URL) || "";
-const PREVIEW_DATA_ENABLED = (import.meta.env && import.meta.env.VITE_PORTAL_PREVIEW_DATA === "true");
-const UI_FIXTURES_ENABLED = (import.meta.env && import.meta.env.VITE_PORTAL_UI_FIXTURES === "true");
-const BYPASS_ENABLED = (import.meta.env && import.meta.env.VITE_PORTAL_BYPASS_AUTH === "true");
-const BYPASS_TOKEN = (import.meta.env && import.meta.env.VITE_PORTAL_BYPASS_TOKEN) || "";
+// Production and preview deployments must always use authenticated live data.
+// Fixture and bypass modes were migration aids and are intentionally disabled.
+const PREVIEW_DATA_ENABLED = false;
+const UI_FIXTURES_ENABLED = false;
+const BYPASS_ENABLED = false;
+const BYPASS_TOKEN = "";
 const BYPASS_KEY = "link-marketing-portal-bypass";
 export const isPreviewMode = PREVIEW_DATA_ENABLED;
 export const isFixtureDataMode = PREVIEW_DATA_ENABLED || UI_FIXTURES_ENABLED;
@@ -98,7 +100,7 @@ const readBypassFromQuery = () => {
 
 // Always let local developers reach the workspace. Production bypass remains
 // an explicit deployment setting and must never be inferred from a URL alone.
-export const isBypassMode = () => Boolean(import.meta.env.DEV || BYPASS_ENABLED || (isPreviewMode && readBypassFromQuery()));
+export const isBypassMode = () => Boolean(import.meta.env.DEV && readBypassFromQuery());
 const isDataFixtureMode = () => Boolean(
   isBypassMode()
   || PREVIEW_DATA_ENABLED
