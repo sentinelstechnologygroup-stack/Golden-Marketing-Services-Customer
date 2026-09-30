@@ -9,7 +9,7 @@ export default function PreviewBanner() {
     >
       <Info className="w-4 h-4 mt-0.5 shrink-0" style={{ color: "var(--gold-2)" }} />
       <p>
-        <span className="font-semibold">Interface preview:</span> Sample program data is shown until the
+        <span className="font-semibold">GMS preview workspace:</span> Sample program data is shown until the
         production customer API and identity provider are connected.
       </p>
     </div>

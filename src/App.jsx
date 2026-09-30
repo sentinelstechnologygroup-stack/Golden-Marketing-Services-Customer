@@ -101,7 +101,7 @@ function App() {
     <div className={isPreviewMode ? "preview-data-enabled" : undefined}>
       {isPreviewMode && (
         <div className="preview-data-notice" role="status">
-          <strong>DEMO DATA</strong>
+          <strong>GMS PREVIEW DATA</strong>
           <span>Account, lead, and performance records are fictional sample content.</span>
         </div>
       )}

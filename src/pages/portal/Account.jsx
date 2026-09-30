@@ -16,7 +16,7 @@ const ROLES = [
   { value: "client_admin", label: "Client Admin" },
 ];
 const ROLE_LABELS = Object.fromEntries(ROLES.map((role) => [role.value, role.label]));
-ROLE_LABELS.lms_super_admin = "LMS Super Admin";
+ROLE_LABELS.lms_super_admin = "GMS Super Admin";
 ROLE_LABELS.customer = "Client";
 ROLE_LABELS.supervisor = "Client Supervisor";
 ROLE_LABELS.admin = "Client Admin";
@@ -131,7 +131,7 @@ export default function Account() {
           <dl className="space-y-2.5 text-[13px]">
             <Field label="Primary market" value={data.primaryMarket} />
             <Field label="Account owner" value={data.accountOwner} />
-            <Field label="Link program manager" value={data.programManager} />
+            <Field label="GMS program manager" value={data.programManager} />
           </dl>
         </SectionCard>
         <SectionCard title="Billing & notification contacts">

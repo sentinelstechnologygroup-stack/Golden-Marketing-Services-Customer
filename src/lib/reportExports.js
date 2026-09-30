@@ -92,7 +92,7 @@ export function exportReportCsv(data) {
 export async function createReportXlsx(data) {
   const { default: ExcelJS } = await import("exceljs");
   const workbook = new ExcelJS.Workbook();
-  workbook.creator = "Link Marketing Solutions";
+    workbook.creator = "Golden Marketing Services";
   workbook.created = new Date();
   for (const section of buildReportSections(data)) {
     const sheet = workbook.addWorksheet(section.name.slice(0, 31));
@@ -140,7 +140,7 @@ export async function createReportDocx(data) {
   const { Document, HeadingLevel, Packer, Paragraph } = docx;
   const sections = buildReportSections(data);
   const children = [
-    new Paragraph({ text: "Link Marketing Solutions", heading: HeadingLevel.HEADING_1 }),
+      new Paragraph({ text: "Golden Marketing Services", heading: HeadingLevel.HEADING_1 }),
     new Paragraph({ text: "Performance Report", heading: HeadingLevel.HEADING_2 }),
     new Paragraph(`Reporting period: ${display(data.range)} | Comparison: ${display(data.comparison)}`),
     new Paragraph(`Generated: ${new Date().toLocaleDateString()}`),
@@ -182,7 +182,7 @@ export async function createReportPdf(data) {
     y += lines.length * lineHeight + (options.gap ?? 2);
   };
 
-  addText("Link Marketing Solutions", { fontSize: 18, bold: true, gap: 3 });
+  addText("Golden Marketing Services", { fontSize: 18, bold: true, gap: 3 });
   addText("Performance Report", { fontSize: 13, bold: true, gap: 2 });
   addText(`Period: ${display(data.range)} | Comparison: ${display(data.comparison)}`);
   addText(`Generated: ${new Date().toLocaleDateString()}`, { gap: 5 });

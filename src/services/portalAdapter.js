@@ -1,4 +1,4 @@
-// Link Marketing Services — Customer Portal Service Adapter
+// Golden Marketing Services — Customer Portal Service Adapter
 // ----------------------------------------------------------------------------
 // This is the ONLY layer that talks to a backend. Every page and component
 // imports from here; nothing in the portal calls portalAuthClient or any data source
@@ -152,7 +152,7 @@ const normalizeAppointmentRow = (row) => {
   return { ...row, prospect: row.prospect || row.leadName || row.title || "Appointment", when: asIso(row.when || row.scheduledStart || row.startAt), type: row.type || row.title || "Appointment", salesperson: row.salesperson || row.assignedToName || row.assignedTo || "Unassigned", confirmation: row.confirmation || (status === "confirmed" ? "Confirmed" : "Pending"), attendance: row.attendance || (['completed', 'show', 'no-show', 'cancelled', 'canceled'].includes(status) ? (status === 'completed' ? 'Show' : status === 'no-show' ? 'No-show' : status) : 'Upcoming'), acceptance: row.acceptance || "Pending", reschedule: row.reschedule || "None" };
 };
 const normalizeDocumentRow = (row) => ({ ...row, uploaded: asIso(row.uploaded || row.createdAt), updated: asIso(row.updated || row.updatedAt || row.createdAt), uploadedBy: row.uploadedBy || row.createdBy || "Portal user", size: row.size ?? row.sizeBytes ?? 0, access: row.access || "Tenant members", version: row.version || "1.0" });
-const normalizeSupportRow = (row) => ({ ...row, type: row.type || row.category || "General", priority: row.priority || "Normal", status: row.status ? `${row.status.charAt(0).toUpperCase()}${row.status.slice(1)}` : "Open", assigned: row.assigned || "Queued - Link team", created: asIso(row.created || row.createdAt), updated: asIso(row.updated || row.updatedAt || row.createdAt), thread: Array.isArray(row.thread) ? row.thread : [] });
+const normalizeSupportRow = (row) => ({ ...row, type: row.type || row.category || "General", priority: row.priority || "Normal", status: row.status ? `${row.status.charAt(0).toUpperCase()}${row.status.slice(1)}` : "Open", assigned: row.assigned || "Queued - GMS team", created: asIso(row.created || row.createdAt), updated: asIso(row.updated || row.updatedAt || row.createdAt), thread: Array.isArray(row.thread) ? row.thread : [] });
 
 async function getActiveTenantId() {
   const session = await getSession();

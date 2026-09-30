@@ -1,7 +1,7 @@
 {
   "id": "/",
-  "name": "Link Marketing Services Customer Portal",
-  "short_name": "LMS Customer",
+  "name": "Golden Marketing Services Customer Portal",
+  "short_name": "GMS Customer",
   "start_url": "/login",
   "scope": "/",
   "display": "standalone",

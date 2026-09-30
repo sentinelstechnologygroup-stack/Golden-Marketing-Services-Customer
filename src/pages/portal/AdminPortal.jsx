@@ -8,7 +8,7 @@ const ADMIN_LINKS = [
   { to: "/account", label: "Team & account", detail: "Review the customer account profile and team settings.", icon: Building2 },
   { to: "/reports", label: "Performance reports", detail: "Open and export the current customer performance reports.", icon: BarChart3 },
   { to: "/billing", label: "Billing", detail: "Review invoices and billing records for this account.", icon: CreditCard },
-  { to: "/support", label: "Support", detail: "Contact the Link Marketing Solutions support team.", icon: LifeBuoy },
+  { to: "/support", label: "Support", detail: "Contact the Golden Marketing Services support team.", icon: LifeBuoy },
 ];
 
 export default function AdminPortal() {
@@ -16,7 +16,7 @@ export default function AdminPortal() {
   const user = session?.user || session;
   return (
     <div>
-      <PageHeader title="Admin Portal" description="Administrator access for your Link Marketing Solutions account." />
+      <PageHeader title="Admin Portal" description="Administrator access for your Golden Marketing Services account." />
       <SectionCard title="Administrator access" className="mb-4">
         <div className="flex items-start gap-3">
           <div className="rounded-xl bg-[#e7f1ed] p-3 text-[#17665a]"><ShieldCheck className="h-5 w-5" /></div>
