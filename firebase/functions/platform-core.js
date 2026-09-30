@@ -220,7 +220,10 @@ exports.health = onRequest({ cors: false }, (_request, response) => {
   response.status(200).json({ service: 'linkmarketing-backend', status: 'ok' });
 });
 
-exports.getMyProfile = onCall({ enforceAppCheck: true }, async (request) => {
+// Firebase App Check is still being re-registered for the new GMS portal
+// domains. Keep Firebase Auth plus the tenant/role checks authoritative while
+// allowing the temporary review deployments to load their authenticated data.
+exports.getMyProfile = onCall({ enforceAppCheck: false }, async (request) => {
   const caller = requireAuth(request);
   const user = await auth.getUser(caller.uid);
   const [profile, memberships, assignments] = await Promise.all([
@@ -255,7 +258,7 @@ exports.getMyProfile = onCall({ enforceAppCheck: true }, async (request) => {
   };
 });
 
-exports.getAccountWorkspace = onCall({ enforceAppCheck: true }, async (request) => {
+exports.getAccountWorkspace = onCall({ enforceAppCheck: false }, async (request) => {
   const { tenantId } = request.data || {};
   const { caller, membership } = await requireMembership(request, tenantId, ['client', 'client_admin', 'client_supervisor', 'lms_super_admin']);
   const [tenant, members, invitations, audits, profile] = await Promise.all([
@@ -309,7 +312,7 @@ exports.updateMyProfile = onCall({ enforceAppCheck: true }, async (request) => {
   return { ok: true, profile: { ...profile, updatedAt: undefined } };
 });
 
-exports.getSecurityWorkspace = onCall({ enforceAppCheck: true }, async (request) => {
+exports.getSecurityWorkspace = onCall({ enforceAppCheck: false }, async (request) => {
   const { tenantId } = request.data || {};
   const { caller } = await requireMembership(request, tenantId, ['client', 'client_admin', 'client_supervisor', 'lms_super_admin']);
   const [user, profile, audits] = await Promise.all([
@@ -413,7 +416,7 @@ exports.acceptInvitation = onCall({ enforceAppCheck: true }, async (request) => 
   return { tenantId, uid: caller.uid, role: invitation.role, active: true };
 });
 
-exports.listMyMemberships = onCall({ enforceAppCheck: true }, async (request) => {
+exports.listMyMemberships = onCall({ enforceAppCheck: false }, async (request) => {
   const caller = requireAuth(request);
   const memberships = await db.collectionGroup('members').where('uid', '==', caller.uid).where('active', '==', true).get();
   return { memberships: memberships.docs.map((doc) => ({ id: doc.id, ...doc.data() })) };
@@ -441,7 +444,7 @@ exports.updateNotificationPreferences = onCall({ enforceAppCheck: true }, async 
   return { ok: true, preferences };
 });
 
-exports.getNotificationWorkspace = onCall({ enforceAppCheck: true }, async (request) => {
+exports.getNotificationWorkspace = onCall({ enforceAppCheck: false }, async (request) => {
   const { tenantId } = request.data || {};
   const { caller } = await requireMembership(request, tenantId, ['client', 'client_admin', 'client_supervisor', 'lms_super_admin']);
   const [preferences, notifications] = await Promise.all([
@@ -516,7 +519,7 @@ function averageResponseMinutes(leads) {
   return values.length ? Number((values.reduce((total, value) => total + value, 0) / values.length).toFixed(1)) : 0;
 }
 
-exports.getDashboardWorkspace = onCall({ enforceAppCheck: true }, async (request) => {
+exports.getDashboardWorkspace = onCall({ enforceAppCheck: false }, async (request) => {
   const { tenantId } = request.data || {};
   await requireMembership(request, tenantId, ['client', 'client_admin', 'client_supervisor', 'lms_super_admin']);
   const [tenant, leadsSnapshot, appointmentsSnapshot] = await Promise.all([
@@ -554,7 +557,7 @@ exports.getDashboardWorkspace = onCall({ enforceAppCheck: true }, async (request
   };
 });
 
-exports.getLiveReport = onCall({ enforceAppCheck: true }, async (request) => {
+exports.getLiveReport = onCall({ enforceAppCheck: false }, async (request) => {
   const { tenantId, range = null, comparison = null, rangeStart = null, rangeEnd = null } = request.data || {};
   await requireMembership(request, tenantId, ['client', 'client_admin', 'client_supervisor', 'lms_super_admin']);
   const [leadsSnapshot, appointmentsSnapshot] = await Promise.all([
@@ -591,7 +594,7 @@ exports.getLiveReport = onCall({ enforceAppCheck: true }, async (request) => {
   };
 });
 
-exports.getAgentCollection = onCall({ enforceAppCheck: true }, async (request) => {
+exports.getAgentCollection = onCall({ enforceAppCheck: false }, async (request) => {
   const { tenantId, collectionName, limit: requestedLimit = 200 } = request.data || {};
   const { assignment } = await requireAgentAssignment(request, tenantId, ['admin', 'supervisor', 'agent', 'auditor']);
   if (!AGENT_COLLECTIONS.has(collectionName)) throw new HttpsError('invalid-argument', 'Collection is not available through the CRM API.');
