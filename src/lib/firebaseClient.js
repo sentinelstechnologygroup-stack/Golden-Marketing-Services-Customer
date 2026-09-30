@@ -1,5 +1,4 @@
 import { getApp, getApps, initializeApp } from "firebase/app";
-import { initializeAppCheck, ReCaptchaEnterpriseProvider } from "firebase/app-check";
 import { connectAuthEmulator, getAuth } from "firebase/auth";
 import { connectFunctionsEmulator, getFunctions } from "firebase/functions";
 import { connectFirestoreEmulator, getFirestore } from "firebase/firestore";
@@ -31,16 +30,9 @@ export const firebaseConfigured = required.every((key) => Boolean(firebaseConfig
 export const firebaseApp = firebaseConfigured
   ? (getApps().length ? getApp() : initializeApp(firebaseConfig))
   : null;
-// App Check is enabled explicitly after the new GMS portal domains are
-// registered in Firebase. A stale Vercel key must never block Firebase Auth.
-const appCheckSiteKey = env("VITE_FIREBASE_CUSTOMER_PORTAL_APP_CHECK_SITE_KEY");
-const appCheckEnabled = env("VITE_FIREBASE_ENABLE_APP_CHECK") === "true";
-export const firebaseAppCheck = firebaseApp && appCheckEnabled && appCheckSiteKey && typeof window !== "undefined"
-  ? initializeAppCheck(firebaseApp, {
-      provider: new ReCaptchaEnterpriseProvider(appCheckSiteKey),
-      isTokenAutoRefreshEnabled: true,
-    })
-  : null;
+// App Check is re-enabled after the new GMS portal domains are registered.
+// Leaving initialization off prevents a stale preview key from blocking Auth.
+export const firebaseAppCheck = null;
 export const firebaseAuth = firebaseApp ? getAuth(firebaseApp) : null;
 export const firebaseFunctions = firebaseApp ? getFunctions(firebaseApp, "us-central1") : null;
 export const firebaseDb = firebaseApp ? getFirestore(firebaseApp) : null;
