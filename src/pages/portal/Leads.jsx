@@ -146,7 +146,7 @@ export default function Leads() {
                       </td>
                       <td className="px-4 py-3">{l.handoffType || "—"}</td>
                       <td className="px-4 py-3">{l.rep}</td>
-                      <td className="px-4 py-3"><Link to={`/leads/${l.id}`} className="inline-flex items-center gap-1 text-[12px] font-medium hover:underline" style={{ color: "var(--teal)" }}>View <ArrowRight className="w-3.5 h-3.5" /></Link></td>
+                      <td className="px-4 py-3"><Link to={`/leads/${l.id}`} className="inline-flex items-center gap-1 text-[12px] font-medium hover:underline" style={{ color: "var(--gms-navy)" }}>View <ArrowRight className="w-3.5 h-3.5" /></Link></td>
                     </tr>
                     );
                   })}

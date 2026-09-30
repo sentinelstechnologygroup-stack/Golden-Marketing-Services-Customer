@@ -24,9 +24,9 @@ export function ConversationsAreaChart({ data }) {
               <stop offset="100%" stopColor="#C9A24B" stopOpacity={0.02} />
             </linearGradient>
           </defs>
-          <CartesianGrid stroke="#EFEAE0" vertical={false} />
-          <XAxis dataKey="date" tick={{ fontSize: 11, fill: "#5A6B6D" }} axisLine={false} tickLine={false} />
-          <YAxis tick={{ fontSize: 11, fill: "#5A6B6D" }} axisLine={false} tickLine={false} width={36} />
+          <CartesianGrid stroke="#DED6C7" vertical={false} />
+          <XAxis dataKey="date" tick={{ fontSize: 11, fill: "#7A838C" }} axisLine={false} tickLine={false} />
+          <YAxis tick={{ fontSize: 11, fill: "#7A838C" }} axisLine={false} tickLine={false} width={36} />
           <Tooltip contentStyle={TOOLTIP_STYLE} labelStyle={{ color: "#9FB5B3" }} />
           <Area type="monotone" dataKey="conversations" name="Conversations" stroke="#14857F" strokeWidth={2} fill="url(#convGrad)" />
           <Area type="monotone" dataKey="qualified" name="Qualified" stroke="#C9A24B" strokeWidth={2} fill="url(#qualGrad)" />
@@ -41,9 +41,9 @@ export function SourceBarChart({ data }) {
     <div className="w-full h-[220px]" role="img" aria-label="Lead source distribution">
       <ResponsiveContainer width="100%" height="100%">
         <BarChart data={data} layout="vertical" margin={{ top: 4, right: 12, left: 8, bottom: 0 }}>
-          <CartesianGrid stroke="#EFEAE0" horizontal={false} />
-          <XAxis type="number" tick={{ fontSize: 11, fill: "#5A6B6D" }} axisLine={false} tickLine={false} />
-          <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: "#33474A" }} axisLine={false} tickLine={false} width={104} />
+          <CartesianGrid stroke="#DED6C7" horizontal={false} />
+          <XAxis type="number" tick={{ fontSize: 11, fill: "#7A838C" }} axisLine={false} tickLine={false} />
+          <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: "#5D6670" }} axisLine={false} tickLine={false} width={104} />
           <Tooltip contentStyle={TOOLTIP_STYLE} labelStyle={{ color: "#9FB5B3" }} cursor={{ fill: "rgba(20,133,127,0.06)" }} />
           <Bar dataKey="value" name="Leads" radius={[0, 4, 4, 0]} barSize={16}>
             {data.map((_, i) => <Cell key={i} fill={i % 2 ? "#0D6E68" : "#14857F"} />)}
@@ -65,9 +65,9 @@ export function TrendChart({ data }) {
               <stop offset="100%" stopColor="#0B2A2E" stopOpacity={0.02} />
             </linearGradient>
           </defs>
-          <CartesianGrid stroke="#EFEAE0" vertical={false} />
-          <XAxis dataKey="date" tick={{ fontSize: 11, fill: "#5A6B6D" }} axisLine={false} tickLine={false} />
-          <YAxis tick={{ fontSize: 11, fill: "#5A6B6D" }} axisLine={false} tickLine={false} width={36} />
+          <CartesianGrid stroke="#DED6C7" vertical={false} />
+          <XAxis dataKey="date" tick={{ fontSize: 11, fill: "#7A838C" }} axisLine={false} tickLine={false} />
+          <YAxis tick={{ fontSize: 11, fill: "#7A838C" }} axisLine={false} tickLine={false} width={36} />
           <Tooltip contentStyle={TOOLTIP_STYLE} labelStyle={{ color: "#9FB5B3" }} />
           <Area type="monotone" dataKey="leads" name="Leads" stroke="#0B2A2E" strokeWidth={2} fill="url(#trendGrad)" />
           <Area type="monotone" dataKey="qualified" name="Qualified" stroke="#C9A24B" strokeWidth={2} fill="transparent" />

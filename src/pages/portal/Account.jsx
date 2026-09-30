@@ -80,7 +80,7 @@ export default function Account() {
         </SectionCard>
         <SectionCard title="Sales-team routing contacts">
           <ul className="space-y-2 text-[13px]">
-            {data.salesRoutingContacts.map((c) => <li key={c.email} className="flex items-center gap-2"><Mail className="w-4 h-4" style={{ color: "var(--teal)" }} /><div><div style={{ color: "var(--shell)" }}>{c.name}</div><div className="text-[12px]" style={{ color: "var(--muted-ink)" }}>{c.role} · {c.email}</div></div></li>)}
+            {data.salesRoutingContacts.map((c) => <li key={c.email} className="flex items-center gap-2"><Mail className="w-4 h-4" style={{ color: "var(--gms-navy)" }} /><div><div style={{ color: "var(--shell)" }}>{c.name}</div><div className="text-[12px]" style={{ color: "var(--muted-ink)" }}>{c.role} · {c.email}</div></div></li>)}
           </ul>
         </SectionCard>
       </div>
@@ -109,7 +109,7 @@ export default function Account() {
                     <Mail className="w-4 h-4" style={{ color: "var(--warn)" }} />
                     <div className="flex-1 min-w-0"><div className="text-[13px] font-medium" style={{ color: "var(--shell)" }}>{inv.email}</div><div className="text-[11.5px]" style={{ color: "var(--muted-ink)" }}>Invited as {inv.role} · {fmtDate(inv.sent)}</div></div>
                     <Badge tone="warn">{inv.status}</Badge>
-                    <button onClick={() => alert(`Invitation resent to ${inv.email}. (preview)`)} className="touch-target w-9 h-9 rounded-lg flex items-center justify-center focus-ring" style={{ color: "var(--teal)" }}><RefreshCw className="w-4 h-4" /></button>
+                    <button onClick={() => alert(`Invitation resent to ${inv.email}. (preview)`)} className="touch-target w-9 h-9 rounded-lg flex items-center justify-center focus-ring" style={{ color: "var(--gms-navy)" }}><RefreshCw className="w-4 h-4" /></button>
                   </li>
                 ))}
               </ul>
@@ -124,7 +124,7 @@ export default function Account() {
               <tbody>
                 {data.users.map((u) => (
                   <tr key={u.id} className="border-b last:border-0" style={{ borderColor: "var(--line-2)" }}>
-                    <td className="px-2 py-3"><div className="flex items-center gap-2.5"><span className="w-8 h-8 rounded-full flex items-center justify-center text-[11px] font-semibold text-white shrink-0" style={{ background: "var(--teal-2)" }}>{initials(u.name)}</span><div><div className="font-semibold" style={{ color: "var(--shell)" }}>{u.name}</div><div className="text-[11.5px]" style={{ color: "var(--muted-ink)" }}>{u.email}</div></div></div></td>
+                    <td className="px-2 py-3"><div className="flex items-center gap-2.5"><span className="w-8 h-8 rounded-full flex items-center justify-center text-[11px] font-semibold text-white shrink-0" style={{ background: "var(--gms-deep)" }}>{initials(u.name)}</span><div><div className="font-semibold" style={{ color: "var(--shell)" }}>{u.name}</div><div className="text-[11.5px]" style={{ color: "var(--muted-ink)" }}>{u.email}</div></div></div></td>
                     <td className="px-2 py-3">
                       <select value={u.role} onChange={(e) => changeRole(u.id, e.target.value)} disabled={u.role === "Owner"} className="touch-target rounded-lg px-2 text-[12.5px] bg-white border focus-ring disabled:opacity-70" style={{ borderColor: "var(--line)" }}>{ROLES.map((r) => <option key={r}>{r}</option>)}</select>
                     </td>
@@ -143,7 +143,7 @@ export default function Account() {
         <SectionCard title="Account activity history">
           <ul className="space-y-2.5">
             {data.activity.map((a, i) => (
-              <li key={i} className="flex items-start gap-2.5 text-[12.5px]"><span className="w-1.5 h-1.5 rounded-full mt-1.5 shrink-0" style={{ background: "var(--teal)" }} /><div><span style={{ color: "var(--shell)" }} className="font-medium">{a.event}</span><div style={{ color: "var(--muted-ink)" }}>{a.actor} · {fmtDateTime(a.at)}</div></div></li>
+              <li key={i} className="flex items-start gap-2.5 text-[12.5px]"><span className="w-1.5 h-1.5 rounded-full mt-1.5 shrink-0" style={{ background: "var(--gms-navy)" }} /><div><span style={{ color: "var(--shell)" }} className="font-medium">{a.event}</span><div style={{ color: "var(--muted-ink)" }}>{a.actor} · {fmtDateTime(a.at)}</div></div></li>
             ))}
           </ul>
         </SectionCard>

@@ -113,8 +113,8 @@ function CalendarView({ appointments }) {
           const items = days[d.toDateString()] || [];
           const isToday = d.toDateString() === today.toDateString();
           return (
-            <div key={d.toISOString()} className="min-h-[96px] p-2 rounded-lg border" style={{ borderColor: isToday ? "var(--teal)" : "var(--line-2)", background: isToday ? "var(--teal-soft)" : "#fff" }}>
-              <div className="text-[11px] font-semibold mb-1" style={{ color: isToday ? "var(--teal-2)" : "var(--muted-ink)" }}>
+            <div key={d.toISOString()} className="min-h-[96px] p-2 rounded-lg border" style={{ borderColor: isToday ? "var(--gms-navy)" : "var(--line-2)", background: isToday ? "var(--gms-champagne)" : "#fff" }}>
+              <div className="text-[11px] font-semibold mb-1" style={{ color: isToday ? "var(--gms-deep)" : "var(--muted-ink)" }}>
                 {d.toLocaleDateString("en-US", { weekday: "short" })} {d.getDate()}
               </div>
               <div className="space-y-1">

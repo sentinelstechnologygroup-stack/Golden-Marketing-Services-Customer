@@ -33,7 +33,7 @@ const Account = lazy(() => import("@/pages/portal/Account"));
 function PageFallback() {
   return (
     <div className="flex items-center justify-center py-24">
-      <div className="w-8 h-8 border-2 border-[var(--line)] border-t-[var(--teal)] rounded-full animate-spin" />
+      <div className="w-8 h-8 border-2 border-[var(--line)] border-t-[var(--gms-navy)] rounded-full animate-spin" />
     </div>
   );
 }

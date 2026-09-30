@@ -17,7 +17,7 @@ function Collapsible({ title, children, defaultOpen = true }) {
     <div className="portal-card">
       <button onClick={() => setOpen((o) => !o)} className="w-full flex items-center justify-between px-4 sm:px-5 py-3.5 focus-ring rounded-t-[14px]" aria-expanded={open}>
         <span className="font-display text-[15px] font-semibold" style={{ color: "var(--shell)" }}>{title}</span>
-        <span className="text-[12px] font-medium" style={{ color: "var(--teal)" }}>{open ? "Hide" : "Show"}</span>
+        <span className="text-[12px] font-medium" style={{ color: "var(--gms-navy)" }}>{open ? "Hide" : "Show"}</span>
       </button>
       {open && <div className="px-4 sm:px-5 pb-5">{children}</div>}
     </div>
@@ -30,7 +30,7 @@ export default function LeadDetail() {
 
   if (loading) return <div className="space-y-4"><Skeleton className="h-10 w-40" /><Skeleton className="h-48 w-full" /><Skeleton className="h-48 w-full" /></div>;
   if (error) return <ErrorState error={error} onRetry={retry} />;
-  if (!lead) return <EmptyState title="Lead not found" description="This lead may have been removed or you may not have access." action={<Link to="/leads" className="text-[13px] font-medium hover:underline" style={{ color: "var(--teal)" }}>Back to leads</Link>} />;
+  if (!lead) return <EmptyState title="Lead not found" description="This lead may have been removed or you may not have access." action={<Link to="/leads" className="text-[13px] font-medium hover:underline" style={{ color: "var(--gms-navy)" }}>Back to leads</Link>} />;
 
   const lifecycle = derivePortalLifecycle(lead);
   const verification = verificationState(lead);
@@ -79,7 +79,7 @@ export default function LeadDetail() {
               <span className="absolute left-2 top-1 bottom-1 w-px" style={{ background: "var(--line)" }} />
               {lead.timeline.map((t, i) => (
                 <li key={i} className="relative pb-4 last:pb-0">
-                  <span className="absolute -left-[18px] top-1 w-2.5 h-2.5 rounded-full border-2" style={{ background: "#fff", borderColor: "var(--teal)" }} />
+                  <span className="absolute -left-[18px] top-1 w-2.5 h-2.5 rounded-full border-2" style={{ background: "#fff", borderColor: "var(--gms-navy)" }} />
                   <div className="text-[13px] font-medium" style={{ color: "var(--shell)" }}>{t.event}</div>
                   <div className="text-[11.5px]" style={{ color: "var(--muted-ink)" }}>{fmtDateTime(t.at)}</div>
                 </li>
@@ -87,7 +87,7 @@ export default function LeadDetail() {
             </ol>
           </SectionCard>
 
-          <SectionCard title="LMS Qualification Receipt" subtitle="Evidence-backed checkpoints for this opportunity">
+          <SectionCard title="GMS Qualification Receipt" subtitle="Evidence-backed checkpoints for this opportunity">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <ReceiptRow icon={ShieldCheck} label="Lifecycle stage" value={lifecycleLabel(lifecycle)} />
               <ReceiptRow icon={CheckCircle2} label="Identity / mobile" value={verification.label} good={verification.key === "verified"} />
@@ -137,7 +137,7 @@ export default function LeadDetail() {
               )}
               {lead.liveTransfer && (
                 <div className="flex items-start gap-3">
-                  <div className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0" style={{ background: "var(--teal-soft)" }}><Headset className="w-5 h-5" style={{ color: "var(--teal)" }} /></div>
+                  <div className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0" style={{ background: "var(--gms-champagne)" }}><Headset className="w-5 h-5" style={{ color: "var(--gms-navy)" }} /></div>
                   <div>
                     <div className="text-[13.5px] font-semibold" style={{ color: "var(--shell)" }}>Connected to {lead.liveTransfer.recipient}</div>
                     <div className="text-[12.5px]" style={{ color: "var(--muted-ink)" }}>{fmtTime(lead.liveTransfer.connectedAt)} · {Math.round(lead.liveTransfer.durationSec / 60)} min · {lead.liveTransfer.outcome}</div>
@@ -152,7 +152,7 @@ export default function LeadDetail() {
             <ol className="space-y-2.5">
               {lead.events.map((e, i) => (
                 <li key={i} className="flex items-start gap-3 text-[12.5px]">
-                  <span className="w-1.5 h-1.5 rounded-full mt-1.5 shrink-0" style={{ background: "var(--teal)" }} />
+                  <span className="w-1.5 h-1.5 rounded-full mt-1.5 shrink-0" style={{ background: "var(--gms-navy)" }} />
                   <div><span style={{ color: "var(--shell)" }} className="font-medium">{e.action}</span> <span style={{ color: "var(--muted-ink)" }}>— {e.actor} · {fmtDateTime(e.at)}</span></div>
                 </li>
               ))}
@@ -185,7 +185,7 @@ export default function LeadDetail() {
 function ReceiptRow({ icon: Icon, label, value, good = false }) {
   return (
     <div className="flex items-start gap-2.5 p-3 rounded-lg border" style={{ borderColor: "var(--line-2)", background: "var(--offwhite)" }}>
-      <Icon className="w-4 h-4 mt-0.5 shrink-0" style={{ color: good ? "var(--success)" : "var(--teal)" }} />
+      <Icon className="w-4 h-4 mt-0.5 shrink-0" style={{ color: good ? "var(--success)" : "var(--gms-navy)" }} />
       <div>
         <div className="text-[11px]" style={{ color: "var(--muted-ink)" }}>{label}</div>
         <div className="text-[13px] font-semibold capitalize" style={{ color: good ? "var(--success)" : "var(--shell)" }}>{String(value ?? "—")}</div>

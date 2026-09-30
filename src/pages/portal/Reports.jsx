@@ -112,7 +112,7 @@ export default function Reports() {
               { label: "Accepted", value: data.outcome.accepted, tone: "var(--success)" },
               { label: "Refused", value: data.outcome.refused, tone: "var(--danger)" },
               { label: "Pending", value: data.outcome.pending, tone: "var(--warn)" },
-              { label: "Closed-won", value: data.outcome.closedWon, tone: "var(--teal)" },
+              { label: "Closed-won", value: data.outcome.closedWon, tone: "var(--gms-navy)" },
               { label: "Closed-lost", value: data.outcome.closedLost, tone: "var(--muted-ink)" },
               { label: "In progress", value: data.outcome.inProgress, tone: "var(--gold-2)" },
             ].map((o) => (
@@ -140,7 +140,7 @@ function PerformanceTable({ title, rows, headers }) {
                 <td className="px-2 py-2.5 font-medium" style={{ color: "var(--shell)" }}>{r.name}</td>
                 <td className="px-2 py-2.5 text-right">{r.a}</td>
                 <td className="px-2 py-2.5 text-right">{r.b}</td>
-                <td className="px-2 py-2.5 text-right font-semibold" style={{ color: "var(--teal-2)" }}>{r.c}</td>
+                <td className="px-2 py-2.5 text-right font-semibold" style={{ color: "var(--gms-deep)" }}>{r.c}</td>
               </tr>
             ))}
           </tbody>

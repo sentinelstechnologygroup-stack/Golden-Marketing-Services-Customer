@@ -12,7 +12,7 @@ import { CardSkeleton } from "@/components/portal/Skeleton";
 import ErrorState from "@/components/portal/ErrorState";
 import EmptyState from "@/components/portal/EmptyState";
 import { fmtDateTime, fmtTime, relativeTime, pct } from "@/lib/portalUtils";
-import { LMS_LIFECYCLE } from "@/lib/leadLifecycle";
+import { GMS_LIFECYCLE } from "@/lib/leadLifecycle";
 
 export default function Dashboard() {
   const { session } = usePortalAuth();
@@ -61,8 +61,8 @@ export default function Dashboard() {
       {/* Response time callout */}
       <div className="mt-4 portal-card p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-6">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0" style={{ background: "var(--teal-soft)" }}>
-            <Clock className="w-5 h-5" style={{ color: "var(--teal)" }} />
+          <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0" style={{ background: "var(--gms-champagne)" }}>
+            <Clock className="w-5 h-5" style={{ color: "var(--gms-navy)" }} />
           </div>
           <div>
             <div className="eyebrow" style={{ color: "var(--muted-ink)" }}>Average first response</div>
@@ -105,7 +105,7 @@ export default function Dashboard() {
       <div className="mt-4">
         <SectionCard title="GMS Qualification Gate" subtitle="The controlled lifecycle behind every documented handoff">
           <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2">
-            {LMS_LIFECYCLE.map((stage, i) => (
+            {GMS_LIFECYCLE.map((stage, i) => (
               <div key={stage.key} className="rounded-lg border p-3 min-h-[82px]" style={{ borderColor: "var(--line-2)", background: i >= 4 ? "var(--gold-soft)" : "var(--offwhite)" }}>
                 <div className="text-[10px] font-semibold" style={{ color: "var(--muted-ink)" }}>{String(i + 1).padStart(2, "0")}</div>
                 <div className="mt-1 text-[12px] font-semibold leading-4" style={{ color: "var(--shell)" }}>{stage.label}</div>
@@ -131,7 +131,7 @@ export default function Dashboard() {
                       <span className="font-semibold" style={{ color: "var(--shell)" }}>{f.value}</span>
                     </div>
                     <div className="h-2.5 rounded-full overflow-hidden" style={{ background: "var(--line-2)" }}>
-                      <div className="h-full rounded-full" style={{ width: `${width}%`, background: i >= 4 ? "var(--gold)" : "var(--teal)" }} />
+                      <div className="h-full rounded-full" style={{ width: `${width}%`, background: i >= 4 ? "var(--gold)" : "var(--gms-navy)" }} />
                     </div>
                   </div>
                 </li>
@@ -145,13 +145,13 @@ export default function Dashboard() {
       <div className="mt-4 grid grid-cols-1 lg:grid-cols-2 gap-4">
         <SectionCard
           title="Recent lead activity"
-          action={<Link to="/leads" className="inline-flex items-center gap-1 text-[12px] font-medium hover:underline" style={{ color: "var(--teal)" }}>All leads <ArrowRight className="w-3.5 h-3.5" /></Link>}
+          action={<Link to="/leads" className="inline-flex items-center gap-1 text-[12px] font-medium hover:underline" style={{ color: "var(--gms-navy)" }}>All leads <ArrowRight className="w-3.5 h-3.5" /></Link>}
         >
           <ul className="divide-y" style={{ borderColor: "var(--line-2)" }}>
             {data.recentLeads.map((l) => (
               <li key={l.id}>
                 <Link to={`/leads/${l.id}`} className="flex items-center gap-3 py-2.5 hover:bg-[var(--cream)] -mx-2 px-2 rounded-lg focus-ring">
-                  <div className="w-9 h-9 rounded-full flex items-center justify-center text-[12px] font-semibold text-white shrink-0" style={{ background: "var(--teal-2)" }}>
+                  <div className="w-9 h-9 rounded-full flex items-center justify-center text-[12px] font-semibold text-white shrink-0" style={{ background: "var(--gms-deep)" }}>
                     {l.name.split(" ").map((p) => p[0]).slice(0, 2).join("")}
                   </div>
                   <div className="min-w-0 flex-1">
@@ -170,7 +170,7 @@ export default function Dashboard() {
 
         <SectionCard
           title="Upcoming appointments"
-          action={<Link to="/appointments" className="inline-flex items-center gap-1 text-[12px] font-medium hover:underline" style={{ color: "var(--teal)" }}>All <ArrowRight className="w-3.5 h-3.5" /></Link>}
+          action={<Link to="/appointments" className="inline-flex items-center gap-1 text-[12px] font-medium hover:underline" style={{ color: "var(--gms-navy)" }}>All <ArrowRight className="w-3.5 h-3.5" /></Link>}
         >
           <ul className="space-y-3">
             {data.upcomingAppointments.map((a) => (
@@ -198,7 +198,7 @@ export default function Dashboard() {
               { label: "Accepted", value: data.outcome.accepted, tone: "var(--success)" },
               { label: "Refused", value: data.outcome.refused, tone: "var(--danger)" },
               { label: "Pending", value: data.outcome.pending, tone: "var(--warn)" },
-              { label: "Closed-won", value: data.outcome.closedWon, tone: "var(--teal)" },
+              { label: "Closed-won", value: data.outcome.closedWon, tone: "var(--gms-navy)" },
               { label: "Closed-lost", value: data.outcome.closedLost, tone: "var(--muted-ink)" },
               { label: "In progress", value: data.outcome.inProgress, tone: "var(--gold-2)" },
             ].map((o) => (

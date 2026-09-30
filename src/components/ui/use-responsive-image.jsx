@@ -16,8 +16,8 @@ export function useResponsiveImage({ parsed, fittingType, focalPoint, quality, c
     const replace = (event) => onSourceChange(
       event.detail.src, getImagePreviewClassName(className, wrapper.className, cn("inline-block relative", className))
     )
-    wrapper.addEventListener("base44:image-replace", replace)
-    return () => wrapper.removeEventListener("base44:image-replace", replace)
+    wrapper.addEventListener("GMS:image-replace", replace)
+    return () => wrapper.removeEventListener("GMS:image-replace", replace)
   }, [className, onSourceChange])
 
   const crop = fittingType !== "fit"

@@ -36,7 +36,7 @@ export default function Security() {
           <div><div className="eyebrow" style={{ color: "var(--muted-ink)" }}>Security score</div><div className="text-[13px] mt-1" style={{ color: "var(--ink-2)" }}>{data.mfaEnabled ? "MFA enabled · " : ""}{data.sessions.length} active sessions</div></div>
         </div>
         <div className="portal-card p-5 lg:col-span-2 flex items-center gap-3">
-          <ShieldCheck className="w-5 h-5 shrink-0" style={{ color: "var(--teal)" }} />
+          <ShieldCheck className="w-5 h-5 shrink-0" style={{ color: "var(--gms-navy)" }} />
           <p className="text-[13px]" style={{ color: "var(--ink-2)" }}>Idle-session timeout is set to <strong>{data.idleTimeoutMinutes} minutes</strong>. Sessions expire automatically and rotate on privilege changes.</p>
           <GhostButton className="ml-auto" onClick={() => alert("Step-up authentication required for this change. (preview)")}>Change timeout</GhostButton>
         </div>
@@ -50,7 +50,7 @@ export default function Security() {
               const Icon = m.type === "Authenticator app" ? Smartphone : KeyRound;
               return (
                 <li key={m.id} className="flex items-center gap-3 p-3 rounded-lg border" style={{ borderColor: "var(--line-2)" }}>
-                  <Icon className="w-5 h-5" style={{ color: "var(--teal)" }} />
+                  <Icon className="w-5 h-5" style={{ color: "var(--gms-navy)" }} />
                   <div className="flex-1 min-w-0"><div className="text-[13px] font-semibold" style={{ color: "var(--shell)" }}>{m.type}</div><div className="text-[12px] truncate" style={{ color: "var(--muted-ink)" }}>{m.name} · added {m.added}</div></div>
                   {m.primary && <Badge tone="teal">Primary</Badge>}
                 </li>

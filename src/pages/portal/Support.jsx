@@ -41,7 +41,7 @@ export default function Support() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <div className="lg:col-span-1 space-y-3">
           {requests.length === 0 ? <div className="portal-card"><EmptyState title="No support requests yet" /></div> : requests.map((r) => (
-            <button key={r.id} onClick={() => setActiveId(r.id)} className="portal-card p-4 w-full text-left focus-ring" style={{ borderColor: activeId === r.id ? "var(--teal)" : undefined }}>
+            <button key={r.id} onClick={() => setActiveId(r.id)} className="portal-card p-4 w-full text-left focus-ring" style={{ borderColor: activeId === r.id ? "var(--gms-navy)" : undefined }}>
               <div className="flex items-center justify-between gap-2">
                 <Badge tone={r.status === "Resolved" ? "success" : r.status === "Open" ? "warn" : "neutral"}>{r.status}</Badge>
                 <Badge tone={r.priority === "Urgent" || r.priority === "High" ? "danger" : "neutral"}>{r.priority}</Badge>

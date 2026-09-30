@@ -15,7 +15,7 @@ export default function InvoiceDetail() {
 
   if (loading) return <div className="space-y-4"><Skeleton className="h-10 w-40" /><Skeleton className="h-64 w-full" /></div>;
   if (error) return <ErrorState error={error} onRetry={retry} />;
-  if (!inv) return <EmptyState title="Invoice not found" action={<Link to="/billing" className="text-[13px] font-medium hover:underline" style={{ color: "var(--teal)" }}>Back to billing</Link>} />;
+  if (!inv) return <EmptyState title="Invoice not found" action={<Link to="/billing" className="text-[13px] font-medium hover:underline" style={{ color: "var(--gms-navy)" }}>Back to billing</Link>} />;
 
   const download = () => {
     const lines = [`Invoice ${inv.number}`, `Period: ${inv.period}`, `Date: ${inv.date}`, `Status: ${inv.status}`, "", "Line items:"];

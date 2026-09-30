@@ -71,8 +71,8 @@ export default function BillingReviewDialog({ open, onClose, invoices = [], onSu
             <label className="block text-[12.5px] font-semibold mb-1.5" style={{ color: "var(--ink-2)" }}>Supporting note</label>
             <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={4} className="w-full touch-target rounded-lg px-3 py-2.5 text-[14px] bg-white border focus-ring resize-none" style={{ borderColor: "var(--line)" }} placeholder="Add context for the review team…" />
           </div>
-          <div className="text-[11.5px] flex items-start gap-2 p-3 rounded-lg" style={{ background: "var(--teal-soft)", color: "var(--ink-2)" }}>
-            <ShieldCheck className="w-4 h-4 mt-0.5 shrink-0" style={{ color: "var(--teal)" }} />
+          <div className="text-[11.5px] flex items-start gap-2 p-3 rounded-lg" style={{ background: "var(--gms-champagne)", color: "var(--ink-2)" }}>
+            <ShieldCheck className="w-4 h-4 mt-0.5 shrink-0" style={{ color: "var(--gms-navy)" }} />
             Reviews must be submitted within 30 days of the invoice date. Approved credits apply to your next invoice. Review history is immutable.
           </div>
           {err && <div role="alert" className="text-[12.5px] px-3 py-2 rounded-lg" style={{ background: "rgba(180,69,47,0.08)", color: "var(--danger)" }}>{err}</div>}

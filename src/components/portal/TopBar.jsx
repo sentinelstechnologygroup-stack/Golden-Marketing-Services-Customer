@@ -49,7 +49,7 @@ export default function TopBar({ title, onOpenMenu }) {
         className="hidden sm:flex touch-target h-10 pl-1.5 pr-2.5 rounded-lg items-center gap-2 focus-ring border"
         style={{ borderColor: "var(--line)" }}
       >
-        <span className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-semibold text-white" style={{ background: "var(--teal)" }}>
+        <span className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-semibold text-white" style={{ background: "var(--gms-navy)" }}>
           {session?.user?.initials}
         </span>
         <ChevronDown className="w-4 h-4" style={{ color: "var(--muted-ink)" }} />

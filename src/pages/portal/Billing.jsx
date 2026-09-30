@@ -54,7 +54,7 @@ export default function Billing() {
         </div>
 
         <div className="portal-card p-5">
-          <div className="flex items-center gap-2 mb-3"><CreditCard className="w-4 h-4" style={{ color: "var(--teal)" }} /><span className="font-display text-[15px] font-semibold" style={{ color: "var(--shell)" }}>Payment method</span></div>
+          <div className="flex items-center gap-2 mb-3"><CreditCard className="w-4 h-4" style={{ color: "var(--gms-navy)" }} /><span className="font-display text-[15px] font-semibold" style={{ color: "var(--shell)" }}>Payment method</span></div>
           <p className="text-[13px]" style={{ color: "var(--ink-2)" }}>{data.paymentMethod}</p>
           <p className="mt-2 text-[11.5px]" style={{ color: "var(--muted-ink)" }}>Card and bank details are handled by the payment provider. Full card numbers are never collected or stored in the portal.</p>
           <div className="mt-4 pt-3 border-t" style={{ borderColor: "var(--line-2)" }}>
@@ -82,7 +82,7 @@ export default function Billing() {
                     <td className="px-2 py-3 text-right">{inv.qualified}</td>
                     <td className="px-2 py-3 text-right font-semibold">{fmtMoney(inv.amount)}</td>
                     <td className="px-2 py-3 text-right"><Badge tone={inv.status === "Paid" ? "success" : "warn"}>{inv.status}</Badge></td>
-                    <td className="px-2 py-3 text-right"><button onClick={() => downloadInvoice(inv)} aria-label={`Download ${inv.number}`} className="touch-target w-9 h-9 rounded-lg inline-flex items-center justify-center focus-ring" style={{ color: "var(--teal)" }}><Download className="w-4 h-4" /></button></td>
+                    <td className="px-2 py-3 text-right"><button onClick={() => downloadInvoice(inv)} aria-label={`Download ${inv.number}`} className="touch-target w-9 h-9 rounded-lg inline-flex items-center justify-center focus-ring" style={{ color: "var(--gms-navy)" }}><Download className="w-4 h-4" /></button></td>
                   </tr>
                 ))}
               </tbody>

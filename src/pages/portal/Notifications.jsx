@@ -88,7 +88,7 @@ export default function Notifications() {
                           disabled={locked}
                           aria-label={`${LABELS[key]} ${c.label}`}
                           className="touch-target w-11 h-6 rounded-full inline-flex items-center px-0.5 transition-colors focus-ring disabled:opacity-60"
-                          style={{ background: prefs[c.key] ? "var(--teal)" : "var(--line)", justifyContent: prefs[c.key] ? "flex-end" : "flex-start" }}
+                          style={{ background: prefs[c.key] ? "var(--gms-navy)" : "var(--line)", justifyContent: prefs[c.key] ? "flex-end" : "flex-start" }}
                         >
                           <span className="w-5 h-5 rounded-full bg-white shadow" />
                         </button>

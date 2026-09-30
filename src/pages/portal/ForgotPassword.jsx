@@ -67,8 +67,8 @@ export default function ForgotPassword() {
         {!token && !sent && (
           <div className="portal-card p-6 sm:p-8">
             <div className="flex justify-center mb-4">
-              <div className="w-12 h-12 rounded-full flex items-center justify-center" style={{ background: "var(--teal-soft)" }}>
-                <Mail className="w-6 h-6" style={{ color: "var(--teal)" }} />
+              <div className="w-12 h-12 rounded-full flex items-center justify-center" style={{ background: "var(--gms-champagne)" }}>
+                <Mail className="w-6 h-6" style={{ color: "var(--gms-navy)" }} />
               </div>
             </div>
             <h1 className="font-display text-[24px] font-semibold text-center" style={{ color: "var(--shell)" }}>Reset your password</h1>
@@ -100,7 +100,7 @@ export default function ForgotPassword() {
               shortly and can be used only once. For your security, we don’t confirm whether the account exists.
             </p>
             <div className="mt-6">
-              <Link to="/sign-in" className="inline-flex items-center gap-1.5 text-[13px] font-medium hover:underline focus-ring rounded" style={{ color: "var(--teal)" }}>
+              <Link to="/sign-in" className="inline-flex items-center gap-1.5 text-[13px] font-medium hover:underline focus-ring rounded" style={{ color: "var(--gms-navy)" }}>
                 <ArrowLeft className="w-4 h-4" /> Return to sign-in
               </Link>
             </div>
@@ -110,8 +110,8 @@ export default function ForgotPassword() {
         {token && !done && (
           <div className="portal-card p-6 sm:p-8">
             <div className="flex justify-center mb-4">
-              <div className="w-12 h-12 rounded-full flex items-center justify-center" style={{ background: "var(--teal-soft)" }}>
-                <ShieldCheck className="w-6 h-6" style={{ color: "var(--teal)" }} />
+              <div className="w-12 h-12 rounded-full flex items-center justify-center" style={{ background: "var(--gms-champagne)" }}>
+                <ShieldCheck className="w-6 h-6" style={{ color: "var(--gms-navy)" }} />
               </div>
             </div>
             <h1 className="font-display text-[24px] font-semibold text-center" style={{ color: "var(--shell)" }}>Set a new password</h1>

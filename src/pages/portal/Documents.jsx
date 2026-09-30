@@ -67,7 +67,7 @@ export default function Documents() {
           </select>
         </div>
         <div className="mt-2 flex items-center gap-2 text-[11.5px]" style={{ color: "var(--muted-ink)" }}>
-          <ShieldCheck className="w-3.5 h-3.5" style={{ color: "var(--teal)" }} /> Files are private to your account and never served as public media.
+          <ShieldCheck className="w-3.5 h-3.5" style={{ color: "var(--gms-navy)" }} /> Files are private to your account and never served as public media.
         </div>
       </div>
 
@@ -92,14 +92,14 @@ export default function Documents() {
               <tbody>
                 {rows.map((d) => (
                   <tr key={d.id} className="border-b last:border-0" style={{ borderColor: "var(--line-2)" }}>
-                    <td className="px-3 py-3"><button onClick={() => setSelected(d)} className="flex items-center gap-2 text-left hover:underline"><FileText className="w-4 h-4 shrink-0" style={{ color: "var(--teal)" }} /><span className="font-semibold" style={{ color: "var(--shell)" }}>{d.name}</span></button></td>
+                    <td className="px-3 py-3"><button onClick={() => setSelected(d)} className="flex items-center gap-2 text-left hover:underline"><FileText className="w-4 h-4 shrink-0" style={{ color: "var(--gms-navy)" }} /><span className="font-semibold" style={{ color: "var(--shell)" }}>{d.name}</span></button></td>
                     <td className="px-3 py-3"><Badge tone="neutral">{d.category}</Badge></td>
                     <td className="px-3 py-3 whitespace-nowrap">{fmtDate(d.uploaded)}</td>
                     <td className="px-3 py-3 whitespace-nowrap">{fmtDate(d.updated)}</td>
                     <td className="px-3 py-3">{d.uploadedBy}</td>
                     <td className="px-3 py-3 whitespace-nowrap">{fmtFileSize(d.size)}</td>
                     <td className="px-3 py-3 text-[11.5px]" style={{ color: "var(--muted-ink)" }}>{d.access}</td>
-                    <td className="px-3 py-3 text-right"><button aria-label={`Download ${d.name}`} onClick={() => alert(`Download of "${d.name}" is handled by the production API. (preview)`)} className="touch-target w-9 h-9 rounded-lg inline-flex items-center justify-center focus-ring" style={{ color: "var(--teal)" }}><Download className="w-4 h-4" /></button></td>
+                    <td className="px-3 py-3 text-right"><button aria-label={`Download ${d.name}`} onClick={() => alert(`Download of "${d.name}" is handled by the production API. (preview)`)} className="touch-target w-9 h-9 rounded-lg inline-flex items-center justify-center focus-ring" style={{ color: "var(--gms-navy)" }}><Download className="w-4 h-4" /></button></td>
                   </tr>
                 ))}
               </tbody>
@@ -123,7 +123,7 @@ function DocumentDrawer({ doc, onClose }) {
           <button onClick={onClose} aria-label="Close" className="touch-target w-9 h-9 rounded-lg flex items-center justify-center focus-ring" style={{ color: "var(--muted-ink)" }}>✕</button>
         </div>
         <div className="p-5 space-y-4">
-          <div className="flex items-center gap-3"><FileText className="w-10 h-10 rounded-lg p-2" style={{ background: "var(--teal-soft)", color: "var(--teal)" }} /><div><div className="font-semibold text-[14px]" style={{ color: "var(--shell)" }}>{doc.name}</div><div className="text-[12px]" style={{ color: "var(--muted-ink)" }}>{fmtFileSize(doc.size)} · v{doc.version}</div></div></div>
+          <div className="flex items-center gap-3"><FileText className="w-10 h-10 rounded-lg p-2" style={{ background: "var(--gms-champagne)", color: "var(--gms-navy)" }} /><div><div className="font-semibold text-[14px]" style={{ color: "var(--shell)" }}>{doc.name}</div><div className="text-[12px]" style={{ color: "var(--muted-ink)" }}>{fmtFileSize(doc.size)} · v{doc.version}</div></div></div>
           <dl className="space-y-2 text-[13px]">
             <div className="flex justify-between"><dt style={{ color: "var(--muted-ink)" }}>Category</dt><dd style={{ color: "var(--shell)" }}>{doc.category}</dd></div>
             <div className="flex justify-between"><dt style={{ color: "var(--muted-ink)" }}>Uploaded</dt><dd style={{ color: "var(--shell)" }}>{fmtDate(doc.uploaded)}</dd></div>

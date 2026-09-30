@@ -1,7 +1,7 @@
 // Golden Marketing Services — Customer Portal Service Adapter
 // ----------------------------------------------------------------------------
 // This is the ONLY layer that talks to a backend. Every page and component
-// imports from here; nothing in the portal calls Base44 or any data source
+// imports from here; nothing in the portal calls GMS or any data source
 // directly. To go live, set VITE_CUSTOMER_PORTAL_API_URL and implement the
 // matching endpoints server-side — no UI changes required.
 //
@@ -79,7 +79,7 @@ async function request(method, path, body) {
 
 // ---- Auth -----------------------------------------------------------------
 async function getSession() {
-  // Base44/interface previews open directly into the sample customer workspace.
+  // GMS/interface previews open directly into the sample customer workspace.
   // A configured production API still requires its real secure session and MFA.
   if (isPreviewMode) { await delay(120); return sampleSession; }
   try { return await request("GET", "/auth/session"); } catch (e) { if (e.status === 401) return null; throw e; }

@@ -102,7 +102,7 @@ export default function SignIn() {
             <Logo size={30} />
           </div>
 
-          <div className="eyebrow mb-2" style={{ color: "var(--teal)" }}>Customer Portal</div>
+          <div className="eyebrow mb-2" style={{ color: "var(--gms-navy)" }}>Customer Portal</div>
           <h2 className="font-display text-[26px] font-semibold leading-tight" style={{ color: "var(--shell)" }}>
             Sign in to your account
           </h2>
@@ -135,7 +135,7 @@ export default function SignIn() {
                 <label htmlFor="password" className="block text-[12.5px] font-semibold" style={{ color: "var(--ink-2)" }}>
                   Password
                 </label>
-                <Link to="/forgot-password" className="text-[12px] font-medium hover:underline" style={{ color: "var(--teal)" }}>
+                <Link to="/forgot-password" className="text-[12px] font-medium hover:underline" style={{ color: "var(--gms-navy)" }}>
                   Forgot password?
                 </Link>
               </div>
@@ -159,7 +159,7 @@ export default function SignIn() {
             </div>
 
             <label className="flex items-center gap-2.5 cursor-pointer select-none">
-              <input type="checkbox" checked={trust} onChange={(e) => setTrust(e.target.checked)} className="w-4 h-4 rounded accent-[var(--teal)]" />
+              <input type="checkbox" checked={trust} onChange={(e) => setTrust(e.target.checked)} className="w-4 h-4 rounded accent-[var(--gms-navy)]" />
               <span className="text-[13px]" style={{ color: "var(--ink-2)" }}>Trust this device for 30 days</span>
             </label>
 
@@ -176,7 +176,7 @@ export default function SignIn() {
           </form>
 
           <div className="mt-6 pt-5 border-t flex items-center justify-between text-[12px]" style={{ borderColor: "var(--line)", color: "var(--muted-ink)" }}>
-            <Link to="/support" className="inline-flex items-center gap-1.5 hover:underline" style={{ color: "var(--teal)" }}>
+            <Link to="/support" className="inline-flex items-center gap-1.5 hover:underline" style={{ color: "var(--gms-navy)" }}>
               <LifeBuoy className="w-4 h-4" /> Contact support
             </Link>
             <span>Secured · Encrypted · MFA protected</span>

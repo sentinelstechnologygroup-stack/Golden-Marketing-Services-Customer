@@ -1,4 +1,4 @@
-export const LMS_LIFECYCLE = [
+export const GMS_LIFECYCLE = [
   { key: 'inquiry', label: 'Inquiry' },
   { key: 'verified_prospect', label: 'Verified Prospect' },
   { key: 'qualified_lead', label: 'Qualified Lead' },
@@ -10,7 +10,7 @@ export const LMS_LIFECYCLE = [
 ];
 
 export const lifecycleLabel = (value) =>
-  LMS_LIFECYCLE.find((stage) => stage.key === value)?.label || 'Inquiry';
+  GMS_LIFECYCLE.find((stage) => stage.key === value)?.label || 'Inquiry';
 
 export function derivePortalLifecycle(lead = {}) {
   const explicit = lead.lifecycleStage || lead.lifecycle_stage;

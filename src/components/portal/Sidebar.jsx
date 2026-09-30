@@ -67,7 +67,7 @@ export default function Sidebar({ onNavigate }) {
         <div className="flex items-center gap-3 px-2 py-2">
           <div
             className="w-9 h-9 rounded-full flex items-center justify-center text-[13px] font-semibold shrink-0"
-            style={{ background: "var(--teal)", color: "#fff" }}
+            style={{ background: "var(--gms-navy)", color: "#fff" }}
             aria-hidden="true"
           >
             {user?.initials || "—"}

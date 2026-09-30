@@ -37,7 +37,7 @@ export default function Verify() {
       <div className="min-h-screen flex items-center justify-center p-6" style={{ background: "var(--offwhite)" }}>
         <div className="text-center">
           <p className="text-sm" style={{ color: "var(--muted-ink)" }}>No verification in progress.</p>
-          <Link to="/sign-in" className="mt-3 inline-block text-[13px] font-medium hover:underline" style={{ color: "var(--teal)" }}>Return to sign-in</Link>
+          <Link to="/sign-in" className="mt-3 inline-block text-[13px] font-medium hover:underline" style={{ color: "var(--gms-navy)" }}>Return to sign-in</Link>
         </div>
       </div>
     );
@@ -70,8 +70,8 @@ export default function Verify() {
         <div className="flex justify-center mb-6"><Logo size={30} /></div>
         <div className="portal-card p-6 sm:p-8">
           <div className="flex justify-center mb-4">
-            <div className="w-12 h-12 rounded-full flex items-center justify-center" style={{ background: "var(--teal-soft)" }}>
-              <ShieldCheck className="w-6 h-6" style={{ color: "var(--teal)" }} />
+            <div className="w-12 h-12 rounded-full flex items-center justify-center" style={{ background: "var(--gms-champagne)" }}>
+              <ShieldCheck className="w-6 h-6" style={{ color: "var(--gms-navy)" }} />
             </div>
           </div>
           <h1 className="font-display text-[24px] font-semibold text-center" style={{ color: "var(--shell)" }}>
@@ -88,9 +88,9 @@ export default function Verify() {
                   key={m} type="button" onClick={() => setMethod(m)}
                   className="touch-target px-3.5 rounded-lg text-[12.5px] font-medium border focus-ring"
                   style={{
-                    borderColor: method === m ? "var(--teal)" : "var(--line)",
-                    background: method === m ? "var(--teal-soft)" : "#fff",
-                    color: method === m ? "var(--teal-2)" : "var(--ink-2)",
+                    borderColor: method === m ? "var(--gms-navy)" : "var(--line)",
+                    background: method === m ? "var(--gms-champagne)" : "#fff",
+                    color: method === m ? "var(--gms-deep)" : "var(--ink-2)",
                   }}
                 >
                   {m === "authenticator" ? "Authenticator app" : "Email code"}
@@ -128,12 +128,12 @@ export default function Verify() {
             <button
               type="button" onClick={resend} disabled={resendIn > 0}
               className="inline-flex items-center gap-1.5 touch-target px-2 disabled:opacity-50 hover:underline"
-              style={{ color: "var(--teal)" }}
+              style={{ color: "var(--gms-navy)" }}
             >
               <RotateCw className="w-3.5 h-3.5" />
               {resendIn > 0 ? `Resend code in ${resendIn}s` : "Resend code"}
             </button>
-            <Link to="/forgot-password" className="hover:underline" style={{ color: "var(--teal)" }}>Use a recovery code</Link>
+            <Link to="/forgot-password" className="hover:underline" style={{ color: "var(--gms-navy)" }}>Use a recovery code</Link>
           </div>
         </div>
 

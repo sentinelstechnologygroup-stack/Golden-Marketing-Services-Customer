@@ -1,5 +1,5 @@
 const TONES = {
-  teal: { bg: "var(--teal-soft)", fg: "var(--teal-2)", border: "rgba(20,133,127,0.25)" },
+  teal: { bg: "var(--gms-champagne)", fg: "var(--gms-deep)", border: "rgba(20,133,127,0.25)" },
   gold: { bg: "var(--gold-soft)", fg: "var(--gold-2)", border: "rgba(201,162,75,0.3)" },
   neutral: { bg: "var(--line-2)", fg: "var(--ink-2)", border: "var(--line)" },
   success: { bg: "rgba(46,125,91,0.10)", fg: "var(--success)", border: "rgba(46,125,91,0.25)" },

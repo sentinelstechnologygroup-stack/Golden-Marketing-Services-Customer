@@ -31,6 +31,6 @@ IMPLEMENTATION NOTES
 7. For smallest favicon sizes, use the supplied pre-rendered files rather than shrinking the full horizontal logo.
 
 REBRAND CONTEXT
-Golden Marketing Services is the rebrand/relaunch of Link Marketing Services.
+Golden Marketing Services is the active brand for the website, agent workspace, and customer portal.
 Core positioning:
 “Marketing should produce more than clicks. Golden Marketing Services combines advertising, technology, qualification, and customer-acquisition strategy to turn attention into real business opportunities.”
