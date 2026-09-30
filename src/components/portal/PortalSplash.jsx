@@ -22,11 +22,11 @@ export default function PortalSplash({ onComplete, mode = "entry" }) {
       <div className="portal-splash__content">
         <div className="portal-splash__logo-stage">
           <img
-            src="/brand/gms-logo-horizontal-dark.png"
+            src="/brand/gms-logo-horizontal-transparent.png"
             alt="Golden Marketing Services Customer Portal"
             className="portal-splash__logo"
-            width="1600"
-            height="500"
+            width="2172"
+            height="724"
             decoding="sync"
           />
           <span className="portal-splash__light-sweep" aria-hidden="true" />
