@@ -87,7 +87,7 @@ export default function LeadDetail() {
             </ol>
           </SectionCard>
 
-          <SectionCard title="LMS Qualification Receipt" subtitle="Evidence-backed checkpoints for this opportunity">
+          <SectionCard title="GMS Qualification Receipt" subtitle="Evidence-backed checkpoints for this opportunity">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <ReceiptRow icon={ShieldCheck} label="Lifecycle stage" value={lifecycleLabel(lifecycle)} />
               <ReceiptRow icon={CheckCircle2} label="Identity / mobile" value={verification.label} good={verification.key === "verified"} />

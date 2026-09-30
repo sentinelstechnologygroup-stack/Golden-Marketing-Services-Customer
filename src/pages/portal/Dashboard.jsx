@@ -105,7 +105,7 @@ export default function Dashboard() {
 
       {/* Qualification gate */}
       <div className="mt-4">
-        <SectionCard title="LMS Qualification Gate" subtitle="The controlled lifecycle behind every documented handoff">
+        <SectionCard title="GMS Qualification Gate" subtitle="The controlled lifecycle behind every documented handoff">
           <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2">
             {LMS_LIFECYCLE.map((stage, i) => (
               <div key={stage.key} className="rounded-lg border p-3 min-h-[82px]" style={{ borderColor: "var(--line-2)", background: i >= 4 ? "var(--gold-soft)" : "var(--offwhite)" }}>
