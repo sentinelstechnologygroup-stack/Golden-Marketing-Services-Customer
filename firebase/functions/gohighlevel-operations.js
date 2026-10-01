@@ -2,7 +2,7 @@ const { getAuth } = require('firebase-admin/auth');
 const { getFirestore, FieldValue } = require('firebase-admin/firestore');
 const { defineSecret } = require('firebase-functions/params');
 const { HttpsError, onCall } = require('firebase-functions/v2/https');
-const { identifier, readRequest, publicRows } = require('./gohighlevel-contract.cjs');
+const { identifier, readRequest, publicRows, isExampleRow } = require('./gohighlevel-contract.cjs');
 const { connectionVersion } = require('./client-onboarding-policy.cjs');
 
 // JSON lives in Secret Manager, NEVER tenant documents, Vite env vars or responses.
@@ -128,7 +128,11 @@ exports.readGoHighLevelResource = onCall(callable, async (request) => {
   if (contactId && (!Array.isArray(payload.conversations) || payload.conversations.some(row => row.contactId !== contactId))) {
     throw new HttpsError('data-loss', 'Provider response did not match the assigned contact.');
   }
-  try { return { source: 'GoHighLevel', resource, items: publicRows(operation.key, payload, connection.locationId), fetchedAt: new Date().toISOString() }; }
+  try {
+    const rows = publicRows(operation.key, payload, connection.locationId);
+    return { source: 'GoHighLevel', resource, items: rows.filter(row => !isExampleRow(row)),
+      excludedExampleCount: rows.filter(isExampleRow).length, fetchedAt: new Date().toISOString() };
+  }
   catch { throw new HttpsError('data-loss', 'Provider response did not match the authorized location.'); }
 });
 

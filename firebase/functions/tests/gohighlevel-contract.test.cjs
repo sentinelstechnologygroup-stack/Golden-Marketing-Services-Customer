@@ -1,6 +1,12 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { identifier, readRequest, publicRows, locationPayload } = require('../gohighlevel-contract.cjs');
+const { identifier, readRequest, publicRows, locationPayload, isExampleRow } = require('../gohighlevel-contract.cjs');
+
+test('only explicitly labelled provider examples are excluded from production', () => {
+  assert.equal(isExampleRow({ contactName: '(Example) Casey Morgan' }), true);
+  assert.equal(isExampleRow({ name: 'Example Industries' }), false);
+  assert.equal(isExampleRow({ fullName: 'Casey Morgan' }), false);
+});
 
 test('provider requests use only the server-owned location', () => {
   const result = readRequest('conversations', 'location-gms', { locationId: 'attacker', token: 'secret', path: '/users', limit: 10 });

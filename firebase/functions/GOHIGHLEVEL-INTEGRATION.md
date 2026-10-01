@@ -118,6 +118,10 @@ Live maintenance verification connected GMS internal and read conversations,
 calendars and opportunities through the backend adapter. No messages were sent.
 Provider-contact mappings and signed webhook synchronization remain outstanding;
 unmapped leads show an explicit pending error rather than fabricated conversations.
+Live portal verification discovered explicitly labelled `(Example)` contacts in
+the provider account. These are excluded from production responses with an explicit
+excluded-record count; provider records are not deleted. Ordinary names containing
+the word Example are not filtered. This is not automatic fixture detection.
 
 ## Primary documentation
 

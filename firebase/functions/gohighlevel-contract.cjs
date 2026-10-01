@@ -37,6 +37,10 @@ function publicRows(key, payload, locationId) {
   });
 }
 
+function isExampleRow(row) {
+  return [row.name, row.contactName, row.fullName].some(value => typeof value === 'string' && /^\(example\)\s/i.test(value));
+}
+
 function locationPayload(tenant, organization, config) {
   if (!config.companyId || !config.snapshotId) throw new Error('Agency and approved GMS snapshot must be configured.');
   return {
@@ -46,4 +50,4 @@ function locationPayload(tenant, organization, config) {
   };
 }
 
-module.exports = { RESOURCES, identifier, readRequest, publicRows, locationPayload };
+module.exports = { RESOURCES, identifier, readRequest, publicRows, locationPayload, isExampleRow };
