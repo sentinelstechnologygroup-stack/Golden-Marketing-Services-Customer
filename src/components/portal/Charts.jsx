@@ -1,4 +1,19 @@
-import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid, BarChart, Bar, Cell } from "recharts";
+import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid, BarChart, Bar, Cell, Legend } from "recharts";
+
+function EmptyChartFrame({ label, series }) {
+  return <div className="w-full" role="img" aria-label={`${label}. No activity recorded yet.`}>
+    <div className="relative h-[220px]">
+      <svg viewBox="0 0 600 220" preserveAspectRatio="none" className="w-full h-full" aria-hidden="true">
+        {[30, 70, 110, 150, 190].map((y) => <line key={y} x1="35" y1={y} x2="585" y2={y} stroke="var(--line-2)" />)}
+        <path d="M35 20 V190 H585" fill="none" stroke="var(--muted-ink)" />
+      </svg>
+      <div className="absolute inset-0 flex items-center justify-center text-[13px]" style={{ color: "var(--muted-ink)" }}>No activity recorded yet</div>
+    </div>
+    <div className="flex flex-wrap justify-center gap-4 text-[12px]" style={{ color: "var(--muted-ink)" }}>
+      {series.map(([name, color]) => <span key={name} className="inline-flex items-center gap-2"><span className="w-3 h-3 rounded-sm" style={{ background: color }} />{name}</span>)}
+    </div>
+  </div>;
+}
 
 const TOOLTIP_STYLE = {
   background: "var(--shell)",
@@ -10,6 +25,7 @@ const TOOLTIP_STYLE = {
 };
 
 export function ConversationsAreaChart({ data }) {
+  if (!data?.length) return <EmptyChartFrame label="Conversations and qualified opportunities" series={[["Conversations", "var(--teal)"], ["Qualified", "var(--gold)"]]} />;
   return (
     <div className="w-full h-[220px]" role="img" aria-label="Seven-day conversations and qualified opportunities trend">
       <ResponsiveContainer width="100%" height="100%">
@@ -28,6 +44,7 @@ export function ConversationsAreaChart({ data }) {
           <XAxis dataKey="date" tick={{ fontSize: 11, fill: "#5A6B6D" }} axisLine={false} tickLine={false} />
           <YAxis tick={{ fontSize: 11, fill: "#5A6B6D" }} axisLine={false} tickLine={false} width={36} />
           <Tooltip contentStyle={TOOLTIP_STYLE} labelStyle={{ color: "#9FB5B3" }} />
+          <Legend />
           <Area type="monotone" dataKey="conversations" name="Conversations" stroke="#14857F" strokeWidth={2} fill="url(#convGrad)" />
           <Area type="monotone" dataKey="qualified" name="Qualified" stroke="#C9A24B" strokeWidth={2} fill="url(#qualGrad)" />
         </AreaChart>
@@ -37,6 +54,7 @@ export function ConversationsAreaChart({ data }) {
 }
 
 export function SourceBarChart({ data }) {
+  if (!data?.length) return <EmptyChartFrame label="Lead source distribution" series={[["Inquiries by source", "var(--teal)"]]} />;
   return (
     <div className="w-full h-[220px]" role="img" aria-label="Lead source distribution">
       <ResponsiveContainer width="100%" height="100%">
@@ -55,6 +73,7 @@ export function SourceBarChart({ data }) {
 }
 
 export function TrendChart({ data }) {
+  if (!data?.length) return <EmptyChartFrame label="Lead volume and qualified trend" series={[["Inquiries", "var(--teal)"], ["Qualified", "var(--gold)"]]} />;
   return (
     <div className="w-full h-[240px]" role="img" aria-label="Lead volume and qualified trend">
       <ResponsiveContainer width="100%" height="100%">

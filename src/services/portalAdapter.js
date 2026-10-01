@@ -38,10 +38,10 @@
 // browser. Preview mode never transmits entered credentials anywhere.
 
 import {
-  sampleSession, sampleDashboard, sampleLeads, sampleAppointments,
-  sampleReports, sampleBilling, sampleInvoice, sampleDocuments,
-  sampleSupport, sampleNotifications, sampleSecurity, sampleAccount,
-} from "./sampleData";
+  emptySession as sampleSession, emptyDashboard as sampleDashboard, emptyLeads as sampleLeads, emptyAppointments as sampleAppointments,
+  emptyReports as sampleReports, emptyBilling as sampleBilling, emptyInvoice as sampleInvoice, emptyDocuments as sampleDocuments,
+  emptySupport as sampleSupport, emptyNotifications as sampleNotifications, emptySecurity as sampleSecurity, emptyAccount as sampleAccount,
+} from "./emptyPortalData";
 import { firebaseAuth, firebaseConfigured, firebaseFunctions, firebaseDb, firebaseStorage } from "@/lib/firebaseClient";
 import { httpsCallable } from "firebase/functions";
 import { sendPasswordResetEmail, signInWithEmailAndPassword, signOut } from "firebase/auth";
@@ -199,7 +199,7 @@ async function getTenantRows(collectionName) {
     where("tenantId", "==", tenantId),
     limit(250),
   ));
-  return snapshot.docs.map((item) => ({ id: item.id, ...item.data() }));
+  return snapshot.docs.map((item) => ({ id: item.id, ...item.data() })).filter((row) => row.archived !== true);
 }
 export const isPreviewOrBypassMode = () => isBypassMode();
 

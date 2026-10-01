@@ -528,8 +528,8 @@ exports.getDashboardWorkspace = onCall({ enforceAppCheck: false }, async (reques
     db.collection(`tenants/${tenantId}/appointments`).where('tenantId', '==', tenantId).get(),
   ]);
   const tenantData = tenant.exists ? tenant.data() : {};
-  const leads = leadsSnapshot.docs.map((item) => ({ id: item.id, ...item.data() }));
-  const appointments = appointmentsSnapshot.docs.map((item) => ({ id: item.id, ...item.data() }));
+  const leads = leadsSnapshot.docs.map((item) => ({ id: item.id, ...item.data() })).filter((row) => row.archived !== true);
+  const appointments = appointmentsSnapshot.docs.map((item) => ({ id: item.id, ...item.data() })).filter((row) => row.archived !== true);
   const conversations = leads.filter(hasContact).length;
   const qualified = leads.filter(isQualified).length;
   const handedOff = leads.filter(isHandedOff).length;
@@ -568,8 +568,8 @@ exports.getLiveReport = onCall({ enforceAppCheck: false }, async (request) => {
     const value = item.createdAt?.toDate?.() || (item.createdAt ? new Date(item.createdAt) : null);
     return (!rangeStart || !value || value >= new Date(rangeStart)) && (!rangeEnd || !value || value <= new Date(rangeEnd));
   };
-  const leads = leadsSnapshot.docs.map((item) => ({ id: item.id, ...item.data() })).filter(inRange);
-  const appointments = appointmentsSnapshot.docs.map((item) => ({ id: item.id, ...item.data() })).filter(inRange);
+  const leads = leadsSnapshot.docs.map((item) => ({ id: item.id, ...item.data() })).filter((row) => row.archived !== true).filter(inRange);
+  const appointments = appointmentsSnapshot.docs.map((item) => ({ id: item.id, ...item.data() })).filter((row) => row.archived !== true).filter(inRange);
   const contacted = leads.filter(hasContact);
   const qualified = leads.filter(isQualified);
   const handedOff = leads.filter(isHandedOff);
@@ -602,7 +602,7 @@ exports.getAgentCollection = onCall({ enforceAppCheck: false }, async (request) 
   const snapshot = await db.collection(`tenants/${tenantId}/${collectionName}`).where('tenantId', '==', tenantId).limit(pageSize).get();
   const rows = snapshot.docs
     .map((item) => ({ id: item.id, ...item.data() }))
-    .filter((item) => assignmentAllowsBrand(assignment, recordBrandId(item)));
+    .filter((item) => item.archived !== true && assignmentAllowsBrand(assignment, recordBrandId(item)));
   return { rows };
 });
 

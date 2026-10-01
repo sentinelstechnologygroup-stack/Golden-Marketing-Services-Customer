@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Plus, MessageSquare, Paperclip, CheckCircle2 } from "lucide-react";
 import portalAdapter from "@/services/portalAdapter";
 import { usePortalData } from "@/lib/usePortalData";
+import { usePortalAuth } from "@/lib/PortalAuthContext";
 import PageHeader, { PrimaryButton } from "@/components/portal/PageHeader";
 import SectionCard from "@/components/portal/SectionCard";
 import Badge from "@/components/portal/Badge";
@@ -17,6 +18,8 @@ const TYPES = [
 const PRIORITIES = ["Low", "Normal", "High", "Urgent"];
 
 export default function Support() {
+  const { session } = usePortalAuth();
+  const authorName = session?.user?.name || "You";
   const { data, loading, error, retry, setData } = usePortalData(() => portalAdapter.getSupport(), []);
   const [openNew, setOpenNew] = useState(false);
   const [activeId, setActiveId] = useState(null);
@@ -36,7 +39,7 @@ export default function Support() {
         actions={<PrimaryButton onClick={() => setOpenNew((s) => !s)}><Plus className="w-4 h-4" /> New request</PrimaryButton>}
       />
 
-      {openNew && <NewRequestForm onClose={() => setOpenNew(false)} onCreated={(r) => { setData((d) => ({ requests: [r, ...(d?.requests || [])] })); setOpenNew(false); setActiveId(r.id); }} />}
+      {openNew && <NewRequestForm authorName={authorName} onClose={() => setOpenNew(false)} onCreated={(r) => { setData((d) => ({ requests: [r, ...(d?.requests || [])] })); setOpenNew(false); setActiveId(r.id); }} />}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <div className="lg:col-span-1 space-y-3">
@@ -62,10 +65,10 @@ export default function Support() {
             >
               <ul className="space-y-4">
                 {active.thread.map((m, i) => (
-                  <li key={i} className={`flex ${m.from === "Alex Morgan" ? "justify-end" : "justify-start"}`}>
+                  <li key={i} className={`flex ${m.from === authorName ? "justify-end" : "justify-start"}`}>
                     <div className="max-w-[80%]">
                       <div className="text-[11px] mb-1" style={{ color: "var(--muted-ink)" }}>{m.from} · {fmtDateTime(m.at)}</div>
-                      <div className="px-3.5 py-2.5 rounded-2xl text-[13px]" style={{ background: m.from === "Alex Morgan" ? "var(--shell)" : "var(--offwhite)", color: m.from === "Alex Morgan" ? "#fff" : "var(--ink-2)", border: m.from === "Alex Morgan" ? "none" : "1px solid var(--line-2)" }}>{m.body}</div>
+                      <div className="px-3.5 py-2.5 rounded-2xl text-[13px]" style={{ background: m.from === authorName ? "var(--shell)" : "var(--offwhite)", color: m.from === authorName ? "#fff" : "var(--ink-2)", border: m.from === authorName ? "none" : "1px solid var(--line-2)" }}>{m.body}</div>
                     </div>
                   </li>
                 ))}
@@ -92,7 +95,7 @@ export default function Support() {
   );
 }
 
-function NewRequestForm({ onClose, onCreated }) {
+function NewRequestForm({ onClose, onCreated, authorName }) {
   const [type, setType] = useState(TYPES[0]);
   const [subject, setSubject] = useState("");
   const [priority, setPriority] = useState("Normal");
@@ -105,7 +108,7 @@ function NewRequestForm({ onClose, onCreated }) {
     setSubmitting(true);
     try {
       const res = await portalAdapter.createSupport({ type, subject, priority, body });
-      onCreated({ id: res.id, type, subject, priority, status: "Open", assigned: "Queued — GMS team", created: new Date().toISOString().slice(0, 10), updated: new Date().toISOString().slice(0, 10), thread: [{ at: new Date().toISOString(), from: "Alex Morgan", body }], resolution: null });
+      onCreated({ id: res.id, type, subject, priority, status: "Open", assigned: "Queued — GMS team", created: new Date().toISOString().slice(0, 10), updated: new Date().toISOString().slice(0, 10), thread: [{ at: new Date().toISOString(), from: authorName, body }], resolution: null });
     } finally { setSubmitting(false); }
   };
 

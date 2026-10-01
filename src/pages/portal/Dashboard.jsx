@@ -31,12 +31,13 @@ export default function Dashboard() {
   if (!data) return <EmptyState title="No dashboard data available" />;
 
   const m = data.metrics;
-  const maxFunnel = Math.max(...data.funnel.map((f) => f.value));
+  const funnel = data.funnel.length ? data.funnel : ["Lead received", "Rapid response", "Human conversation", "Qualification", "Appointment / transfer", "Sales-team handoff", "Customer outcome"].map((stage) => ({ stage, value: 0 }));
+  const maxFunnel = Math.max(1, ...funnel.map((f) => f.value));
 
   return (
     <div>
       <PageHeader
-        title={data.greeting}
+        title={data.greeting || `Welcome${session?.user?.name ? `, ${session.user.name}` : ""}`}
         description={`${data.programStatus} program · Reporting period ${data.reportingPeriod} · vs. ${data.previousPeriod}`}
         actions={
           <>
@@ -122,8 +123,8 @@ export default function Dashboard() {
       <div className="mt-4">
         <SectionCard title="Lead journey" subtitle="From received lead to customer outcome">
           <ol className="space-y-2">
-            {data.funnel.map((f, i) => {
-              const width = Math.max(8, (f.value / maxFunnel) * 100);
+            {funnel.map((f, i) => {
+              const width = Math.max(0, (f.value / maxFunnel) * 100);
               return (
                 <li key={f.stage} className="flex items-center gap-3">
                   <span className="w-6 text-[12px] font-semibold text-right shrink-0" style={{ color: "var(--muted-ink)" }}>{i + 1}</span>
@@ -140,6 +141,7 @@ export default function Dashboard() {
               );
             })}
           </ol>
+          {!data.funnel.length && <p className="mt-3 text-[12px]" style={{ color: "var(--muted-ink)" }}>No lead journey activity recorded yet.</p>}
         </SectionCard>
       </div>
 
