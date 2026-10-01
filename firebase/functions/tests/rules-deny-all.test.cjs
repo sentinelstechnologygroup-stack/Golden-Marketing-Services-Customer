@@ -24,6 +24,7 @@ test.before(async () => {
     },
   });
   await env.clearStorage();
+  await env.clearFirestore();
 });
 
 test.after(async () => {
