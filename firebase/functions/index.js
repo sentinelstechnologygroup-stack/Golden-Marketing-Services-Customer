@@ -5,3 +5,4 @@ Object.assign(exports, require('./agent-operations'));
 Object.assign(exports, require('./website-ingestion'));
 Object.assign(exports, require('./platform-administration'));
 Object.assign(exports, require('./notification-delivery'));
+Object.assign(exports, require('./gohighlevel-operations'));
