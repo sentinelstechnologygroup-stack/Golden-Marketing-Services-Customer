@@ -109,65 +109,8 @@ async function chooseClientContact(route) {
 }
 
 exports.provisionClient = onCall({ enforceAppCheck: true }, async (request) => {
-  const caller = await requireSuperAdmin(request);
-  const input = request.data || {};
-  const tenantId = safeId(input.tenantSlug || input.clientName, 'tenant');
-  const brandId = safeId(input.brandSlug || input.brandName || input.clientName, 'brand');
-  const clientName = clean(input.clientName, 200);
-  const brandName = clean(input.brandName || input.clientName, 200);
-  const industryId = clean(input.industryId || 'general', 100).toLowerCase().replace(/[^a-z0-9-]+/g, '-');
-  const adminEmail = clean(input.adminEmail, 320).toLowerCase();
-  const routeKey = clean(input.routeKey || tenantId.replace(/^tenant-/, ''), 120).toLowerCase().replace(/[^a-z0-9-]+/g, '-');
-  if (!clientName || !brandName || !adminEmail || !routeKey) throw new HttpsError('invalid-argument', 'Client, Brand, administrator email, and route key are required.');
-  const tenantRef = db.doc(`tenants/${tenantId}`);
-  if ((await tenantRef.get()).exists) throw new HttpsError('already-exists', 'This tenant already exists.');
-
-  const now = FieldValue.serverTimestamp();
-  const route = {
-    routeKey, tenantId, brandId, industryId,
-    sourceId: clean(input.sourceId || 'source-website', 120),
-    campaignId: clean(input.campaignId || 'campaign-initial', 120),
-    routingProfileId: clean(input.routingProfileId || 'routing-default', 120),
-    workflowVersion: clean(input.workflowVersion || '1.0', 40),
-    scriptSetId: clean(input.scriptSetId || 'script-default', 120),
-    qualificationFormId: clean(input.qualificationFormId || 'qualification-default', 120),
-    consentPolicyId: clean(input.consentPolicyId || 'consent-standard', 120),
-    retentionPolicyId: clean(input.retentionPolicyId || 'retention-standard', 120),
-    notificationProfileId: clean(input.notificationProfileId || 'notification-default', 120),
-    assignedAgentUids: Array.isArray(input.assignedAgentUids) ? input.assignedAgentUids.filter(Boolean) : [],
-    status: 'active', createdAt: now, updatedAt: now, createdBy: caller.uid,
-  };
-  const batch = db.batch();
-  batch.set(tenantRef, { tenantId, name: clientName, legalName: clean(input.legalName || clientName, 200), status: input.status === 'beta' ? 'beta' : 'active', environment: 'production', industry: industryId, vertical: industryId, demo: false, createdAt: now, updatedAt: now, createdBy: caller.uid });
-  batch.set(db.doc(`tenants/${tenantId}/organizations/default`), { tenantId, name: clientName, status: 'active', settings: { timezone: clean(input.timezone || 'America/Chicago', 80), domain: clean(input.domain, 300) }, createdAt: now, updatedAt: now });
-  batch.set(db.doc(`tenants/${tenantId}/brands/${brandId}`), { tenantId, brandId, name: brandName, status: 'active', domain: clean(input.domain, 300), industryId, createdAt: now, updatedAt: now });
-  batch.set(db.doc(`tenants/${tenantId}/leadSources/${route.sourceId}`), { tenantId, brandId, name: 'Website', type: 'website', status: 'active', createdAt: now, updatedAt: now });
-  batch.set(db.doc(`tenants/${tenantId}/campaigns/${route.campaignId}`), { tenantId, brandId, name: 'Initial program', status: 'active', startDate: new Date().toISOString().slice(0, 10), endDate: null, createdAt: now, updatedAt: now });
-  batch.set(db.doc(`tenants/${tenantId}/routingRules/${route.routingProfileId}`), { tenantId, brandId, name: 'Default client contact rotation', status: 'active', priority: 1, conditions: [], destination: { type: 'client_contact_rotation' }, createdAt: now, updatedAt: now });
-  batch.set(db.doc(`tenants/${tenantId}/config/workflow`), { ...route, notificationChannels: input.notificationChannels || ['in_app', 'email'], retentionDays: Number(input.retentionDays) || 2555, createdAt: now, updatedAt: now });
-  batch.set(db.doc(`industryConfigs/${industryId}`), { industryId, workflowVersion: route.workflowVersion, scriptSetId: route.scriptSetId, qualificationFormId: route.qualificationFormId, routingProfileId: route.routingProfileId, consentPolicyId: route.consentPolicyId, retentionPolicyId: route.retentionPolicyId, updatedAt: now, updatedBy: caller.uid }, { merge: true });
-  batch.set(db.doc(`ingestionRoutes/${routeKey}`), route);
-
-  let initialAdminUid = null;
-  const adminUser = await auth.getUserByEmail(adminEmail).catch(() => null);
-  if (adminUser && !adminUser.disabled) {
-    initialAdminUid = adminUser.uid;
-    batch.set(db.doc(`tenants/${tenantId}/members/${adminUser.uid}`), { uid: adminUser.uid, tenantId, email: adminEmail, role: 'client_admin', active: true, brandIds: [brandId], invitedBy: caller.uid, createdAt: now, updatedAt: now });
-    batch.set(db.doc(`tenants/${tenantId}/businessOwners/${adminUser.uid}`), { tenantId, brandId, uid: adminUser.uid, memberUid: adminUser.uid, name: clean(adminUser.displayName || `${brandName} administrator`, 200), email: adminEmail, phone: '', roleType: 'client_contact', status: 'active', routingEligible: true, createdAt: now, updatedAt: now });
-  } else {
-    const invitationRef = db.collection(`tenants/${tenantId}/invitations`).doc();
-    batch.set(invitationRef, { tenantId, email: adminEmail, role: 'client_admin', brandIds: [brandId], status: 'pending', invitedBy: caller.uid, createdAt: now, updatedAt: now });
-  }
-
-  for (const agentUid of route.assignedAgentUids) {
-    const assignmentRef = db.collection('agentAssignments').doc();
-    const assignment = { agentUid, tenantId, industry: industryId, brandId, brandIds: [brandId], campaignIds: [route.campaignId], sourceIds: [route.sourceId], scope: 'assigned', permissions: ['lead.read', 'lead.update', 'appointment.manage'], role: 'agent', status: 'active', assignedBy: caller.uid, createdAt: now, updatedAt: now };
-    batch.set(assignmentRef, assignment);
-    batch.set(db.doc(`agentUsers/${agentUid}/assignments/${tenantId}`), { ...assignment, assignmentId: assignmentRef.id }, { merge: true });
-  }
-  batch.set(db.collection(`tenants/${tenantId}/auditLogs`).doc(), { tenantId, actorUid: caller.uid, action: 'client.provisioned', target: tenantId, metadata: { brandId, industryId, routeKey, initialAdminUid }, occurredAt: now, createdAt: now });
-  await batch.commit();
-  return { ok: true, tenantId, brandId, routeKey, initialAdminUid, invitationPending: !initialAdminUid };
+  await requireSuperAdmin(request);
+  throw new HttpsError('failed-precondition', 'Use Agent Portal > Clients to save onboarding and verify readiness before enabling intake.');
 });
 
 exports.ingestWebsiteLead = onRequest({ cors: false, secrets: [ingestionKey], timeoutSeconds: 30 }, async (request, response) => {
@@ -186,6 +129,23 @@ exports.ingestWebsiteLead = onRequest({ cors: false, secrets: [ingestionKey], ti
     db.doc(`tenants/${route.tenantId}/brands/${route.brandId}`).get(),
   ]);
   if (!tenant.exists || !brand.exists || tenant.data().demo === true) return response.status(409).json({ error: 'Production route is unavailable' });
+  if (route.managedBy === 'onboarding') {
+    const policy = require('./client-onboarding-policy.cjs');
+    const [config, connection, approval] = await Promise.all([
+      db.doc(`tenants/${route.tenantId}/config/onboarding`).get(),
+      db.doc(`tenants/${route.tenantId}/integrations/readiness`).get(),
+      db.doc(`tenants/${route.tenantId}/campaignApprovals/${route.campaignId}`).get(),
+    ]);
+    const data = config.data()?.data;
+    const campaign = data?.campaigns?.find(c => c.id === route.campaignId);
+    const verified = connection.data() || {};
+    if (!campaign || config.data()?.lifecycle !== 'routing_enabled' || config.data()?.revision !== route.onboardingRevision
+      || verified.configHash !== policy.connectionVersion(data) || verified.ghlVerified !== true || verified.phoneVerified !== true
+      || !(verified.verifiedAtMs > Date.now() - 86400000 && verified.verifiedAtMs <= Date.now())
+      || approval.data()?.status !== 'approved' || approval.data()?.version !== policy.campaignVersion(campaign)) {
+      return response.status(409).json({ error:'Client launch readiness requires renewed verification or approval' });
+    }
+  }
 
   const leadRef = db.collection(`tenants/${route.tenantId}/leads`).doc();
   const [assignedTo, clientContact] = await Promise.all([chooseAssignment(route, leadRef.id), chooseClientContact(route)]);

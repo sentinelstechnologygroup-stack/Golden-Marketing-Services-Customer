@@ -36,10 +36,17 @@ service firebase.storage {
       allow delete: if lmsSuperAdmin() || member(tenantId);
     }
 
-    match /tenants/{tenantId}/{allPaths=**} {
+    match /tenants/{tenantId}/documents/{documentId}/{allPaths=**} {
       allow read: if lmsSuperAdmin() || member(tenantId);
-      allow create, update: if (lmsSuperAdmin() || member(tenantId)) && supportedFile();
-      allow delete: if lmsSuperAdmin() || member(tenantId);
+      // Registration seals the file. New creative versions use new document IDs.
+      allow write: if (lmsSuperAdmin() || member(tenantId)) && supportedFile()
+        && !firestore.exists(/databases/(default)/documents/tenants/$(tenantId)/documents/$(documentId));
+    }
+
+    match /tenants/{tenantId}/{folder}/{allPaths=**} {
+      allow read: if lmsSuperAdmin() || member(tenantId);
+      allow create, update: if folder != 'documents' && (lmsSuperAdmin() || member(tenantId)) && supportedFile();
+      allow delete: if folder != 'documents' && (lmsSuperAdmin() || member(tenantId));
     }
 
     match /{allPaths=**} { allow read, write: if false; }

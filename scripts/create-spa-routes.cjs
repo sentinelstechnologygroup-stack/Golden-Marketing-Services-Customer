@@ -14,6 +14,7 @@ const routes = [
   "reports",
   "billing",
   "documents",
+  "onboarding",
   "support",
   "notifications",
   "security",

@@ -453,6 +453,16 @@ const updateMemberRole = (uid, role) => (isDataFixtureMode() ? delay().then(() =
 const setMemberStatus = (uid, active) => (isDataFixtureMode() ? delay().then(() => ({ ok: true, uid, active })) : isFirebaseMode ? callTenantFunction("setMembershipStatus", { uid, active }) : request("PATCH", `/account/users/${uid}/status`, { active }));
 
 export const portalAdapter = {
+  onboarding: {
+    get: async () => {
+      if (!isFirebaseMode || isDataFixtureMode()) return { data: { campaigns: [] }, campaignVersions: {}, approvals: {}, documents: [] };
+      return (await httpsCallable(firebaseFunctions, 'getGmsClient')({ clientId: await getActiveTenantId() })).data;
+    },
+    approve: async (data) => {
+      if (!isFirebaseMode || isDataFixtureMode()) throw new PortalApiError(400, 'Approvals require an authenticated live client account.');
+      return (await httpsCallable(firebaseFunctions, 'recordGmsCampaignApproval')({ ...data, clientId: await getActiveTenantId() })).data;
+    },
+  },
   isPreviewMode,
   isFirebaseMode,
   isBypassMode,

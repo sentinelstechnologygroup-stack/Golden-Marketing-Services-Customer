@@ -32,6 +32,7 @@ const Notifications = lazy(() => import("@/pages/portal/Notifications"));
 const Security = lazy(() => import("@/pages/portal/Security"));
 const Account = lazy(() => import("@/pages/portal/Account"));
 const AdminPortal = lazy(() => import("@/pages/portal/AdminPortal"));
+const Onboarding = lazy(() => import("@/pages/portal/Onboarding"));
 
 function PageFallback() {
   return (
@@ -83,6 +84,7 @@ function AppRoutes() {
           <Route path="/billing" element={<Billing />} />
           <Route path="/billing/invoices/:id" element={<InvoiceDetail />} />
           <Route path="/documents" element={<Documents />} />
+          <Route path="/onboarding" element={<Onboarding />} />
           <Route path="/support" element={<Support />} />
           <Route path="/notifications" element={<Notifications />} />
           <Route path="/security" element={<Security />} />

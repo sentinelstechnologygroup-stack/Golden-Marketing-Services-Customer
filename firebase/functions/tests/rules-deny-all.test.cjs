@@ -23,6 +23,7 @@ test.before(async () => {
       rules: fs.readFileSync(path.join(rulesDir, 'storage.rules'), 'utf8'),
     },
   });
+  await env.clearStorage();
 });
 
 test.after(async () => {
@@ -221,4 +222,35 @@ test('Storage limits assigned agents to their Brand path', async () => {
   await assertSucceeds(uploadBytes(ref(storage, 'tenants/tenant-storage-brand/brands/brand-a/recordings/call-a.txt'), bytes, { contentType: 'text/plain' }));
   await assertFails(uploadBytes(ref(storage, 'tenants/tenant-storage-brand/brands/brand-b/recordings/call-b.txt'), bytes, { contentType: 'text/plain' }));
   await assertFails(uploadBytes(ref(storage, 'tenants/tenant-storage-brand/documents/legacy.txt'), bytes, { contentType: 'text/plain' }));
+});
+
+test('client administrators cannot forge onboarding, provider verification or approvals', async () => {
+  const { deleteDoc, updateDoc } = require('firebase/firestore');
+  await env.withSecurityRulesDisabled(async context => {
+    const db = context.firestore();
+    await setDoc(doc(db,'tenants/central/members/client-central'),{uid:'client-central',tenantId:'central',role:'client_admin',active:true});
+    await setDoc(doc(db,'tenants/central/config/onboarding'),{tenantId:'central',revision:1});
+    await setDoc(doc(db,'tenants/central/integrations/readiness'),{tenantId:'central',ghlVerified:false});
+    await setDoc(doc(db,'tenants/central/campaignApprovals/program'),{tenantId:'central',status:'pending'});
+    await setDoc(doc(db,'tenants/central/campaigns/program'),{tenantId:'central',managedBy:'onboarding',status:'paused'});
+  });
+  const db = env.authenticatedContext('client-central').firestore();
+  for (const path of ['config/onboarding','integrations/readiness','campaignApprovals/program','campaigns/program']) {
+    await assertFails(updateDoc(doc(db,`tenants/central/${path}`),{status:'active',ghlVerified:true}));
+    await assertFails(deleteDoc(doc(db,`tenants/central/${path}`)));
+  }
+  await assertFails(getDoc(doc(db,'tenants/central/integrations/readiness')));
+});
+
+test('creative file paths are immutable: replacement requires a new document/version', async () => {
+  await env.withSecurityRulesDisabled(async context => {
+    await setDoc(doc(context.firestore(),'tenants/cabinet/members/cabinet-user'),{uid:'cabinet-user',tenantId:'cabinet',role:'client_admin',active:true});
+  });
+  const storage = env.authenticatedContext('cabinet-user').storage();
+  const file = ref(storage,'tenants/cabinet/documents/creative/readme.txt');
+  await assertSucceeds(uploadBytes(file,new Uint8Array([1]),{contentType:'text/plain'}));
+  await env.withSecurityRulesDisabled(async context => {
+    await setDoc(doc(context.firestore(),'tenants/cabinet/documents/creative'),{tenantId:'cabinet',managedBy:'onboarding'});
+  });
+  await assertFails(uploadBytes(file,new Uint8Array([2]),{contentType:'text/plain'}));
 });

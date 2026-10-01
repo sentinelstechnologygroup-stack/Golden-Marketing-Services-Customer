@@ -14,6 +14,7 @@ export const NAV_ITEMS = [
   { to: "/reports", label: "Reports", icon: BarChart3 },
   { to: "/billing", label: "Billing", icon: CreditCard },
   { to: "/documents", label: "Documents", icon: FileText },
+  { to: "/onboarding", label: "Campaign Approvals", icon: ShieldCheck },
   { to: "/support", label: "Support", icon: LifeBuoy },
   { to: "/notifications", label: "Notifications", icon: Bell },
   { to: "/security", label: "Security", icon: ShieldCheck },

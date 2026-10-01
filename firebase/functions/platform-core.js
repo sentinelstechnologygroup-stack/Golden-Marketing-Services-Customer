@@ -640,6 +640,7 @@ exports.updateAgentRecord = onCall({ enforceAppCheck: true }, async (request) =>
   const recordRef = db.doc(`tenants/${tenantId}/${collectionName}/${recordId}`);
   const current = await recordRef.get();
   if (!current.exists || current.data().tenantId !== tenantId) throw new HttpsError('not-found', 'Record not found.');
+  if (current.data().managedBy === 'onboarding') throw new HttpsError('failed-precondition', 'Update this configuration in Agent Portal > Clients > onboarding.');
   requireAssignmentBrand(assignment, recordBrandId(current.data()));
   const patch = stripImmutablePatch(data);
   await recordRef.update({ ...patch, updatedAt: FieldValue.serverTimestamp(), updatedBy: caller.uid });

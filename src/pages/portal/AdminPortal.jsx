@@ -17,6 +17,7 @@ export default function AdminPortal() {
   return (
     <div>
       <PageHeader title="Admin Portal" description="Administrator access for your Golden Marketing Services account." />
+      {session?.lmsSuperAdmin && <div className="mb-4 rounded-xl border bg-white p-4 text-sm">Viewing client: {session?.company?.name || 'No client selected'}. This is a customer account view, not your GMS organization. All new-client onboarding and GMS administration are in <a className="font-semibold underline" href="https://agentcrm.goldenmarketingservices.com/clients">Agent Portal → Clients</a>.</div>}
       <SectionCard title="Administrator access" className="mb-4">
         <div className="flex items-start gap-3">
           <div className="rounded-xl bg-[#e7f1ed] p-3 text-[#17665a]"><ShieldCheck className="h-5 w-5" /></div>

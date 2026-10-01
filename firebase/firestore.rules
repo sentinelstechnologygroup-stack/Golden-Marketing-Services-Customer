@@ -74,6 +74,7 @@ service cloud.firestore {
 
       match /{collection}/{documentId} {
         allow read: if canAccessTenant(tenantId)
+          && (lmsSuperAdmin() || (collection != 'integrations' && !(collection == 'config' && documentId == 'onboarding')))
           && collection != 'members'
           && collection != 'auditLogs'
           && (!agentAssigned(tenantId) || lmsSuperAdmin() || membership(tenantId) || agentBrandAllowed(tenantId))
@@ -86,6 +87,7 @@ service cloud.firestore {
             || (role(tenantId) in ['admin', 'supervisor', 'client_admin', 'client_supervisor'] && configurationCollection(collection))
             || (role(tenantId) in ['admin', 'client_admin'] && collection in ['support', 'documents']));
         allow update: if membership(tenantId)
+          && (!('managedBy' in resource.data) || resource.data.managedBy != 'onboarding')
           && collection != 'members'
           && collection != 'auditLogs'
           && resource.data.tenantId == tenantId
@@ -94,6 +96,8 @@ service cloud.firestore {
             || (role(tenantId) in ['admin', 'supervisor', 'client_admin', 'client_supervisor'] && configurationCollection(collection))
             || (role(tenantId) in ['admin', 'client_admin'] && collection in ['support', 'documents']));
         allow delete: if membership(tenantId)
+          && !(collection in ['config', 'integrations', 'campaignApprovals'])
+          && (!('managedBy' in resource.data) || resource.data.managedBy != 'onboarding')
           && collection != 'members'
           && collection != 'auditLogs'
           && role(tenantId) in ['admin', 'client_admin'];
