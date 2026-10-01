@@ -1,6 +1,7 @@
 const core = require('./platform-core');
 
 module.exports = {
+  getCustomerCollection: core.getCustomerCollection,
   getMyProfile: core.getMyProfile,
   getAccountWorkspace: core.getAccountWorkspace,
   updateMyProfile: core.updateMyProfile,

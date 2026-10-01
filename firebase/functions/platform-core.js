@@ -519,6 +519,18 @@ function averageResponseMinutes(leads) {
   return values.length ? Number((values.reduce((total, value) => total + value, 0) / values.length).toFixed(1)) : 0;
 }
 
+exports.getCustomerCollection = onCall({ enforceAppCheck: false }, async (request) => {
+  const { tenantId, collectionName } = request.data || {};
+  const { membership } = await requireMembership(request, tenantId, ['client', 'client_admin', 'client_supervisor', 'lms_super_admin']);
+  if (!['leads', 'appointments', 'billing', 'invoices', 'documents', 'supportRequests'].includes(collectionName)) {
+    throw new HttpsError('invalid-argument', 'Collection is not available to the customer portal.');
+  }
+  const snapshot = await db.collection(`tenants/${tenantId}/${collectionName}`).where('tenantId', '==', tenantId).limit(250).get();
+  const allowedBrands = Array.isArray(membership.brandIds) && membership.brandIds.length ? new Set(membership.brandIds) : null;
+  return { rows: snapshot.docs.map((item) => ({ id: item.id, ...item.data() }))
+    .filter((row) => row.archived !== true && (!allowedBrands || !recordBrandId(row) || allowedBrands.has(recordBrandId(row)))) };
+});
+
 exports.getDashboardWorkspace = onCall({ enforceAppCheck: false }, async (request) => {
   const { tenantId } = request.data || {};
   await requireMembership(request, tenantId, ['client', 'client_admin', 'client_supervisor', 'lms_super_admin']);

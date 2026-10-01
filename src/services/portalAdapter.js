@@ -42,10 +42,9 @@ import {
   emptyReports as sampleReports, emptyBilling as sampleBilling, emptyInvoice as sampleInvoice, emptyDocuments as sampleDocuments,
   emptySupport as sampleSupport, emptyNotifications as sampleNotifications, emptySecurity as sampleSecurity, emptyAccount as sampleAccount,
 } from "./emptyPortalData";
-import { firebaseAuth, firebaseConfigured, firebaseFunctions, firebaseDb, firebaseStorage } from "@/lib/firebaseClient";
+import { firebaseAuth, firebaseConfigured, firebaseFunctions, firebaseStorage } from "@/lib/firebaseClient";
 import { httpsCallable } from "firebase/functions";
 import { sendPasswordResetEmail, signInWithEmailAndPassword, signOut } from "firebase/auth";
-import { collection, doc, getDoc, getDocs, limit, query, where } from "firebase/firestore";
 import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
 
 const API_URL = (import.meta.env && import.meta.env.VITE_CUSTOMER_PORTAL_API_URL) || "";
@@ -194,12 +193,8 @@ async function getTenantRows(collectionName) {
   if (!isFirebaseMode) return null;
   const tenantId = await getActiveTenantId();
   if (!tenantId) return [];
-  const snapshot = await getDocs(query(
-    collection(firebaseDb, `tenants/${tenantId}/${collectionName}`),
-    where("tenantId", "==", tenantId),
-    limit(250),
-  ));
-  return snapshot.docs.map((item) => ({ id: item.id, ...item.data() })).filter((row) => row.archived !== true);
+  const result = await httpsCallable(firebaseFunctions, "getCustomerCollection")({ tenantId, collectionName });
+  return (result.data?.rows || []).filter((row) => row.archived !== true);
 }
 export const isPreviewOrBypassMode = () => isBypassMode();
 
@@ -351,7 +346,7 @@ function getLeads(params = {}) {
 
 const getLead = async (id) => {
   if (isDataFixtureMode()) return delay().then(() => sampleLeads.find((l) => l.id === id) || null);
-  if (isFirebaseMode) { const tenantId = await getActiveTenantId(); if (!tenantId) return null; const snapshot = await getDoc(doc(firebaseDb, `tenants/${tenantId}/leads/${id}`)); return snapshot.exists() ? normalizeLeadRow({ id: snapshot.id, ...snapshot.data() }) : null; }
+  if (isFirebaseMode) { const row = (await getTenantRows("leads")).find((item) => item.id === id); return row ? normalizeLeadRow(row) : null; }
   return request("GET", `/leads/${id}`);
 };
 const getAppointments = async () => {
@@ -372,10 +367,8 @@ const getBilling = async () => {
 const getInvoice = async (id) => {
   if (isDataFixtureMode()) return sampleInvoice;
   if (isFirebaseMode) {
-    const tenantId = await getActiveTenantId();
-    if (!tenantId || !id) return null;
-    const snapshot = await getDoc(doc(firebaseDb, `tenants/${tenantId}/invoices/${id}`));
-    return snapshot.exists() ? { id: snapshot.id, ...snapshot.data() } : null;
+    if (!id) return null;
+    return (await getTenantRows("invoices")).find((item) => item.id === id) || null;
   }
   return request("GET", `/billing/invoices/${id}`);
 };
