@@ -78,6 +78,7 @@ exports.saveGmsClient = onCall(options, async request => {
   const caller = await identity(request);
   const tenantId = identifier(request.data?.clientId);
   let data;
+  if (!/^[a-z0-9][a-z0-9_-]{0,39}$/.test(tenantId)) throw new HttpsError('invalid-argument', 'Client identifiers use lowercase letters, numbers and hyphens, up to 40 characters.');
   try { data = policy.normalize(request.data?.data); } catch (error) { throw new HttpsError('invalid-argument', error.message); }
   const expectedRevision = Number(request.data?.revision);
   if (!Number.isSafeInteger(expectedRevision) || expectedRevision < 0) throw new HttpsError('invalid-argument', 'Revision required.');
@@ -144,7 +145,7 @@ exports.saveGmsClient = onCall(options, async request => {
       tx.set(root.collection('scripts').doc(c.id), { tenantId, brandId, name: c.name, body: c.script, status: 'draft', version: expectedRevision + 1, managedBy: 'onboarding', updatedAt: now }, { merge: true });
       tx.set(root.collection('qualificationForms').doc(c.id), { tenantId, brandId, name: c.name, fields: c.qualification.split('\n').filter(Boolean).map((label, i) => ({ id: `question-${i + 1}`, label, type: 'text', required: true })), status: 'draft', version: expectedRevision + 1, managedBy: 'onboarding', updatedAt: now }, { merge: true });
       tx.set(root.collection('routingRules').doc(c.id), { tenantId, brandId, name: c.name, priority: 1, conditions: [{ field: 'campaignId', operator: 'equals', value: c.id }], destination: { type: 'agent_rotation', agentUids: c.agentUids }, status: 'paused', managedBy: 'onboarding', updatedAt: now }, { merge: true });
-      tx.set(db.doc(`ingestionRoutes/${routeKey}`), { tenantId, brandId, industryId: data.industry || 'general', campaignId: c.id, sourceId: c.id, routingProfileId: c.id, scriptSetId: c.id, qualificationFormId: c.id, workflowVersion: 'gms-onboarding-v1', assignedAgentUids: c.agentUids, locationId: data.locationId, consentPolicy: { text: c.consent, requireConsent: true }, retentionPolicy: { retentionDays: 2555 }, notificationProfile: { channels: ['in_app'] }, status: 'paused', managedBy: 'onboarding', updatedAt: now }, { merge: true });
+      tx.set(db.doc(`ingestionRoutes/${routeKey}`), { tenantId, brandId, industryId: data.industry || 'general', campaignId: c.id, sourceId: c.id, routingProfileId: c.id, scriptSetId: c.id, qualificationFormId: c.id, consentPolicyId: `${tenantId}-consent`, retentionPolicyId: `${tenantId}-retention`, workflowVersion: 'gms-onboarding-v1', assignedAgentUids: c.agentUids, locationId: data.locationId, consentPolicy: { text: c.consent, requireConsent: true }, retentionPolicy: { retentionDays: 2555 }, notificationProfile: { channels: ['in_app'] }, status: 'paused', managedBy: 'onboarding', updatedAt: now }, { merge: true });
     }
     if (data.phoneNumber) tx.set(root.collection('phoneNumbers').doc('onboarding'), { tenantId, brandId, phoneNumber: data.phoneNumber, phoneSid: data.phoneSid, provider: 'twilio', status: 'unverified', assignedTo: null, managedBy: 'onboarding', updatedAt: now }, { merge: true });
     if (memberRef) tx.set(memberRef, { tenantId, uid: clientUser.uid, email: data.adminEmail, role: 'client_admin', active: true, updatedAt: now }, { merge: true });

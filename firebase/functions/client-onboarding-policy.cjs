@@ -14,7 +14,7 @@ function normalize(input = {}) {
     locationId: text(input.locationId, 100), phoneNumber: text(input.phoneNumber, 30),
     phoneSid: text(input.phoneSid, 100), billingNotes: text(input.billingNotes, 2000), notes: text(input.notes, 4000),
     campaigns: (Array.isArray(input.campaigns) ? input.campaigns : []).slice(0, 12).map(c => ({
-      id: id(c.id), name: text(c.name, 200), type: text(c.type, 100), source: text(c.source, 200),
+      id: id(c.id).toLowerCase(), name: text(c.name, 200), type: text(c.type, 100), source: text(c.source, 200),
       calendarId: text(c.calendarId, 100), pipelineId: text(c.pipelineId, 100),
       agentUids: [...new Set((Array.isArray(c.agentUids) ? c.agentUids : []).map(uid => id(uid)))].slice(0, 30),
       script: text(c.script, 20000), qualification: text(c.qualification, 12000),
@@ -23,6 +23,7 @@ function normalize(input = {}) {
     })),
   };
   if (!data.name) throw new Error('Client name is required to save a draft.');
+  if (data.campaigns.some(c => c.id.length > 40)) throw new Error('Campaign identifiers must be 40 characters or fewer.');
   if (data.adminEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.adminEmail)) throw new Error('Enter a valid client administrator email.');
   if (data.phoneNumber && !/^\+[1-9]\d{7,14}$/.test(data.phoneNumber)) throw new Error('Use international phone format, for example +13125551234.');
   if (data.locationId && !/^[a-zA-Z0-9_-]+$/.test(data.locationId)) throw new Error('Invalid GoHighLevel location ID.');
