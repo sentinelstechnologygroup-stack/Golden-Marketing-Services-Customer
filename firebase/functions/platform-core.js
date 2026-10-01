@@ -252,6 +252,7 @@ exports.getMyProfile = onCall({ enforceAppCheck: false }, async (request) => {
     timezone: profile.data()?.timezone || null,
     locale: profile.data()?.locale || null,
     disabled: user.disabled,
+    mustChangePassword: user.customClaims?.mustChangePassword === true,
     lmsSuperAdmin: caller.token?.lmsSuperAdmin === true,
     memberships: memberships.docs.map((doc) => ({ id: doc.id, ...doc.data(), role: normalizeRole(doc.data().role) })),
     agentAssignments,

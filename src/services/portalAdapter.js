@@ -457,7 +457,12 @@ export const portalAdapter = {
   isFirebaseMode,
   isBypassMode,
   apiUrl: API_URL,
-  auth: { getSession, createSession, verifyMfa, deleteSession, requestRecovery, completeRecovery },
+  auth: { getSession, createSession, verifyMfa, deleteSession, requestRecovery, completeRecovery,
+    completeInitialPasswordChange: async (newPassword) => {
+      await httpsCallable(firebaseFunctions, "completeInitialPasswordChange")({ newPassword });
+      await signOut(firebaseAuth);
+    },
+  },
   getDashboard, getLeads, getLead, getAppointments, getReports, getBilling, getInvoice,
   createBillingReview, getDocuments, createDocument, downloadDocument, getSupport, createSupport, addSupportReply,
   getNotifications, updateNotifications, getSecurity, updateSecuritySettings, revokeAllSessions, requestCurrentPasswordReset, getAccount, inviteUser,

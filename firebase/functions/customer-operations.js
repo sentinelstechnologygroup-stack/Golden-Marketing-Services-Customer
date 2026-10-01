@@ -1,6 +1,8 @@
 const core = require('./platform-core');
+const initialPassword = require('./initial-password');
 
 module.exports = {
+  completeInitialPasswordChange: initialPassword.completeInitialPasswordChange,
   getCustomerCollection: core.getCustomerCollection,
   getMyProfile: core.getMyProfile,
   getAccountWorkspace: core.getAccountWorkspace,

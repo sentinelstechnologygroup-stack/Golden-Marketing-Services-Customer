@@ -1,8 +1,9 @@
 import { Navigate, Outlet, useLocation } from "react-router-dom";
 import { usePortalAuth } from "@/lib/PortalAuthContext";
+import InitialPasswordChange from "@/components/InitialPasswordChange";
 
 export default function PortalProtectedRoute() {
-  const { status } = usePortalAuth();
+  const { status, session } = usePortalAuth();
   const location = useLocation();
 
   if (status === "loading") {
@@ -15,5 +16,6 @@ export default function PortalProtectedRoute() {
   if (status !== "authenticated") {
     return <Navigate to="/sign-in" replace state={{ from: location.pathname }} />;
   }
+  if (session?.mustChangePassword) return <InitialPasswordChange />;
   return <Outlet />;
 }
