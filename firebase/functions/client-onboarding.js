@@ -67,7 +67,11 @@ exports.listGmsClients = onCall(options, async request => {
     const saved = record.data();
     return { tenantId: tenant.id, name: tenant.data().name || tenant.id, industry: tenant.data().industry || '', lifecycle: saved?.lifecycle || 'not_started', revision: saved?.revision || 0 };
   }));
-  return { clients: clients.sort((a, b) => a.name.localeCompare(b.name)), truncated: tenants.size === 200 };
+  const assignments = await db.collection('agentAssignments').where('status','==','active').limit(100).get();
+  const ids = [...new Set(assignments.docs.filter(d => d.data().role === 'agent').map(d => d.data().agentUid).filter(Boolean))];
+  const users = ids.length ? (await getAuth().getUsers(ids.map(uid => ({uid})))).users : [];
+  const agents = users.filter(u => !u.disabled).map(u => ({uid:u.uid,name:u.displayName || u.email || u.uid}));
+  return { clients: clients.sort((a, b) => a.name.localeCompare(b.name)), agents, truncated: tenants.size === 200 };
 });
 exports.getGmsClient = onCall(options, async request => {
   const tenantId = identifier(request.data?.clientId);
@@ -81,6 +85,10 @@ exports.saveGmsClient = onCall(options, async request => {
   if (!/^[a-z0-9][a-z0-9_-]{0,39}$/.test(tenantId)) throw new HttpsError('invalid-argument', 'Client identifiers use lowercase letters, numbers and hyphens, up to 40 characters.');
   try { data = policy.normalize(request.data?.data); } catch (error) { throw new HttpsError('invalid-argument', error.message); }
   const expectedRevision = Number(request.data?.revision);
+  const chosenAgents = [...new Set(data.campaigns.flatMap(c => c.agentUids))];
+  if (chosenAgents.length > 30) throw new HttpsError('invalid-argument','Choose no more than 30 agents per client.');
+  const authAgents = chosenAgents.length ? await getAuth().getUsers(chosenAgents.map(uid => ({uid}))) : {users:[],notFound:[]};
+  if (authAgents.notFound.length || authAgents.users.some(u => u.disabled)) throw new HttpsError('failed-precondition','Selected agents must have active Firebase identities.');
   if (!Number.isSafeInteger(expectedRevision) || expectedRevision < 0) throw new HttpsError('invalid-argument', 'Revision required.');
   const root = db.doc(`tenants/${tenantId}`);
   const config = root.collection('config').doc('onboarding');
@@ -108,9 +116,10 @@ exports.saveGmsClient = onCall(options, async request => {
     const mapped = mapping ? await tx.get(mapping) : null;
     const oldMapped = oldMapping ? await tx.get(oldMapping) : null;
     if (mapped?.exists && mapped.data().tenantId !== tenantId) throw new HttpsError('already-exists', 'This GoHighLevel location belongs to another GMS client.');
-    const agentIds = [...new Set(data.campaigns.flatMap(c => c.agentUids))];
-    const agentSnapshots = await Promise.all(agentIds.map(uid => tx.get(db.doc(`agentUsers/${uid}/assignments/${tenantId}`))));
-    if (agentSnapshots.some(doc => !doc.exists || doc.data().status !== 'active' || doc.data().role !== 'agent')) throw new HttpsError('failed-precondition', 'Select active agents already assigned to this client.');
+    const agentSnapshots = await Promise.all(chosenAgents.map(uid => tx.get(db.collection('agentAssignments').where('agentUid','==',uid).limit(100))));
+    if (agentSnapshots.some(query => !query.docs.some(doc => doc.data().status === 'active' && doc.data().role === 'agent'))) throw new HttpsError('failed-precondition', 'Select an existing active GMS agent.');
+    const existingAssignments = await Promise.all(chosenAgents.map(uid => tx.get(db.doc(`agentUsers/${uid}/assignments/${tenantId}`))));
+    if (existingAssignments.some(doc => doc.exists && doc.data().role !== 'agent')) throw new HttpsError('failed-precondition', 'An existing privileged assignment cannot be replaced with an agent assignment.');
     const docIds = [...new Set(data.campaigns.flatMap(c => c.documentIds))];
     const docSnapshots = await Promise.all(docIds.map(id => tx.get(root.collection('documents').doc(id))));
     if (docSnapshots.some(doc => !doc.exists || doc.data().archived === true || doc.data().managedBy !== 'onboarding')) throw new HttpsError('failed-precondition', 'Creative files must be uploaded through this client cabinet.');
@@ -128,6 +137,15 @@ exports.saveGmsClient = onCall(options, async request => {
       ...(!tenant.exists ? { tenantId, demo: false, environment: 'production', status: 'onboarding', createdBy: caller.user.uid, createdAt: now } : {}),
     }, { merge: true });
     tx.set(config, { data, brandId, revision: expectedRevision + 1, lifecycle: 'draft', updatedBy: caller.user.uid, updatedAt: now });
+    for (const [index, agentUid] of chosenAgents.entries()) {
+      const previous = existingAssignments[index].data() || {};
+      const assignment = { tenantId,agentUid,industry:data.industry,role:'agent',status:'active',scope:'assigned',
+        brandId:previous.brandId || brandId,brandIds:[...new Set([...(previous.brandIds || []),previous.brandId,brandId].filter(Boolean))],
+        campaignIds:[...new Set([...(previous.campaignIds || []),...data.campaigns.filter(c => c.agentUids.includes(agentUid)).map(c => c.id)])],
+        permissions:['lead.read','lead.update','appointment.manage'],assignedBy:caller.user.uid,updatedAt:now };
+      tx.set(db.doc(`agentUsers/${agentUid}/assignments/${tenantId}`),assignment,{merge:true});
+      tx.set(db.doc(`agentAssignments/${tenantId}--${agentUid}`),assignment,{merge:true});
+    }
     tx.set(root.collection('organizations').doc('default'), { tenantId, name: data.name, legalName: data.legalName, settings: { timezone: data.timezone, domain: data.domain }, status: 'onboarding', updatedAt: now }, { merge: true });
     tx.set(root.collection('brands').doc(brandId), { tenantId, brandId, name: data.brandName || data.name, domain: data.domain, industryId: data.industry, status: 'onboarding', managedBy: 'onboarding', updatedAt: now }, { merge: true });
     if (mapping) tx.set(mapping, { tenantId, updatedAt: now });
@@ -148,7 +166,10 @@ exports.saveGmsClient = onCall(options, async request => {
       tx.set(db.doc(`ingestionRoutes/${routeKey}`), { tenantId, brandId, industryId: data.industry || 'general', campaignId: c.id, sourceId: c.id, routingProfileId: c.id, scriptSetId: c.id, qualificationFormId: c.id, consentPolicyId: `${tenantId}-consent`, retentionPolicyId: `${tenantId}-retention`, workflowVersion: 'gms-onboarding-v1', assignedAgentUids: c.agentUids, locationId: data.locationId, consentPolicy: { text: c.consent, requireConsent: true }, retentionPolicy: { retentionDays: 2555 }, notificationProfile: { channels: ['in_app'] }, status: 'paused', managedBy: 'onboarding', updatedAt: now }, { merge: true });
     }
     if (data.phoneNumber) tx.set(root.collection('phoneNumbers').doc('onboarding'), { tenantId, brandId, phoneNumber: data.phoneNumber, phoneSid: data.phoneSid, provider: 'twilio', status: 'unverified', assignedTo: null, managedBy: 'onboarding', updatedAt: now }, { merge: true });
-    if (memberRef) tx.set(memberRef, { tenantId, uid: clientUser.uid, email: data.adminEmail, role: 'client_admin', active: true, updatedAt: now }, { merge: true });
+    if (memberRef) {
+      tx.set(memberRef, { tenantId, uid: clientUser.uid, email: data.adminEmail, role: 'client_admin', active: true, updatedAt: now }, { merge: true });
+      tx.set(root.collection('businessOwners').doc(`onboarding-${clientUser.uid}`), { tenantId, brandId, uid:clientUser.uid, memberUid:clientUser.uid, name:clientUser.displayName || `${data.name} administrator`, email:data.adminEmail, phone:data.phone, roleType:'client_contact', routingEligible:Boolean(data.phone), status:'active', managedBy:'onboarding', updatedAt:now }, { merge:true });
+    }
     tx.set(root.collection('config').doc('clientAccess'), { adminEmail: data.adminEmail, status: clientUser ? 'active' : 'identity_required', updatedAt: now });
     const adminAssignment = { tenantId, agentUid: caller.user.uid, role: 'admin', status: 'active', scope: 'all', industry: data.industry, tenantName: data.name, updatedAt: now };
     tx.set(db.doc(`agentUsers/${caller.user.uid}/assignments/${tenantId}`), adminAssignment, { merge: true });
@@ -225,6 +246,8 @@ exports.prepareGmsClientLogin = onCall(options, async request => {
     if (current.data()?.data?.adminEmail !== email) throw new HttpsError('aborted', 'Customer email changed. Reload the client.');
     if (member.exists && (member.data().role !== 'client_admin' || member.data().brandIds?.length)) throw new HttpsError('failed-precondition', 'Existing membership scope requires review.');
     tx.set(memberRef, { tenantId, uid:user.uid, email, role:'client_admin', active:true, updatedAt:FieldValue.serverTimestamp() }, { merge:true });
+    const data = current.data().data;
+    tx.set(root.collection('businessOwners').doc(`onboarding-${user.uid}`), { tenantId, brandId:current.data().brandId, uid:user.uid, memberUid:user.uid, name:user.displayName || `${data.name} administrator`, email, phone:data.phone, roleType:'client_contact', routingEligible:Boolean(data.phone), status:'active', managedBy:'onboarding', updatedAt:FieldValue.serverTimestamp() }, { merge:true });
     tx.set(root.collection('config').doc('clientAccess'), { adminEmail:email, status:'active', updatedAt:FieldValue.serverTimestamp() });
     tx.set(root.collection('auditLogs').doc(), { tenantId, action:'client.identity_prepared', actorUid:caller.user.uid, target:user.uid, createdAt:FieldValue.serverTimestamp() });
   });

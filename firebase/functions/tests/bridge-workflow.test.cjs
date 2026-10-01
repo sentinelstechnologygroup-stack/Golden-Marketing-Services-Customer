@@ -63,26 +63,24 @@ test.after(async () => {
   await Promise.all([lmsAdminUid, agentUid, clientUid].map((uid) => auth.deleteUser(uid).catch(() => null)));
 });
 
-test('provisioning, ingestion, Agent workflow, Customer projection, and Brand isolation stay aligned', async () => {
-  const provisioned = await functions.provisionClient.run(callableRequest(lmsAdminUid, {
-    clientName: 'Workflow Bridge Client',
-    tenantSlug: 'workflow-bridge-client',
-    brandName: 'Workflow Primary Brand',
-    brandSlug: 'workflow-primary-brand',
-    industryId: 'general-services',
-    adminEmail: 'workflow-client@example.test',
-    routeKey: 'workflow-bridge-route',
-    assignedAgentUids: [agentUid],
-    notificationChannels: ['in_app'],
-  }, { lmsSuperAdmin: true, platformAdmin: true }));
-
-  assert.equal(provisioned.tenantId, 'tenant-workflow-bridge-client');
-  assert.equal(provisioned.brandId, 'brand-workflow-primary-brand');
-  assert.equal(provisioned.initialAdminUid, clientUid);
-
-  const tenantId = provisioned.tenantId;
-  const brandId = provisioned.brandId;
-  await db.doc(`tenants/${tenantId}/businessOwners/${clientUid}`).update({ phone: '+15555550200', routingEligible: true });
+test('existing-route ingestion, Agent workflow, Customer projection, and Brand isolation stay aligned', async () => {
+  // Regression coverage for already-existing client routes. New onboarding is
+  // covered separately and must not use the retired activate-on-create API.
+  await assert.rejects(functions.provisionClient.run(callableRequest(lmsAdminUid, {})), {code:'failed-precondition'});
+  const tenantId = `tenant-workflow-bridge-${Date.now()}`;
+  const brandId = 'brand-workflow-primary-brand';
+  const route = {tenantId,brandId,industryId:'general-services',sourceId:'source-website',campaignId:'campaign-initial',
+    routingProfileId:'routing-default',workflowVersion:'v1',scriptSetId:'script-default',qualificationFormId:'qualification-default',
+    consentPolicyId:'consent-default',retentionPolicyId:'retention-default',assignedAgentUids:[agentUid],status:'active'};
+  await Promise.all([
+    db.doc(`tenants/${tenantId}`).set({tenantId,name:'Workflow client',demo:false,status:'active'}),
+    db.doc(`tenants/${tenantId}/brands/${brandId}`).set({tenantId,brandId,name:'Workflow brand',status:'active'}),
+    db.doc(`tenants/${tenantId}/members/${clientUid}`).set({tenantId,uid:clientUid,email:'workflow-client@example.test',role:'client_admin',active:true}),
+    db.doc(`tenants/${tenantId}/businessOwners/${clientUid}`).set({tenantId,brandId,uid:clientUid,memberUid:clientUid,name:'Client contact',email:'workflow-client@example.test',phone:'+15555550200',routingEligible:true,status:'active'}),
+    db.doc(`agentUsers/${agentUid}/assignments/${tenantId}`).set({tenantId,agentUid,brandId,brandIds:[brandId],role:'agent',status:'active',scope:'assigned'}),
+    db.doc('ingestionRoutes/workflow-bridge-route').set(route),
+    db.doc(`tenants/${tenantId}/config/workflow`).set({notificationProfile:{channels:['in_app']}}),
+  ]);
   const agentRequest = (data) => callableRequest(agentUid, { tenantId, ...data }, { role: 'agent' });
   const clientRequest = (data) => callableRequest(clientUid, { tenantId, ...data }, { role: 'client_admin' });
 
@@ -216,7 +214,9 @@ test('provisioning, ingestion, Agent workflow, Customer projection, and Brand is
     db.collection(`tenants/${tenantId}/notifications`).get(),
   ]);
   assert.equal(activities.size, 2);
-  assert.ok(audits.size >= 4);
+  for (const action of ['lead.ingested', 'lead.transitioned', 'appointment.create']) {
+    assert.ok(audits.docs.some(doc => doc.data().action === action), `Missing audit event: ${action}`);
+  }
   assert.ok(notifications.size >= 3);
 
   await assert.rejects(
