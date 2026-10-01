@@ -37,7 +37,9 @@ test('fresh roles, tenant isolation, canonical ownership and provider response f
   try {
     await assert.rejects(functions.readGoHighLevelResource.run({ data: { tenantId } }), { code: 'unauthenticated' });
     for (const role of ['agent', 'scoped', 'outsider', 'disabled', 'password', 'revoked']) {
-      await assert.rejects(functions.readGoHighLevelResource.run(call(ids[role], { tenantId, resource: 'calendars' }, { lmsSuperAdmin: true })), { code: 'permission-denied' });
+      for (const resource of ['calendars', 'pipelines', 'workflows', 'forms', 'campaigns']) {
+        await assert.rejects(functions.readGoHighLevelResource.run(call(ids[role], { tenantId, resource }, { lmsSuperAdmin: true })), { code: 'permission-denied' });
+      }
     }
     assert.equal(requests, 0, 'unauthorized callers must never reach provider');
     await assert.rejects(functions.connectExistingGoHighLevelLocation.run(call(ids.customer, { tenantId, locationId: 'location-test' })), { code: 'permission-denied' });

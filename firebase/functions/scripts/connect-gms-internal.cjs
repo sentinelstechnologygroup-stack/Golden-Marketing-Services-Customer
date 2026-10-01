@@ -23,6 +23,7 @@ async function main() {
       notes: 'GMS internal operations workspace. No customer login, fixture records or campaign intake provisioned.',
     } }));
   }
+  await db.doc(`tenants/${tenantId}`).update({ workspaceKind: 'internal' });
   await functions.connectExistingGoHighLevelLocation.run(call({ tenantId, locationId }));
   const checked = await functions.verifyGoHighLevelConnection.run(call({ tenantId }));
   const reads = {};

@@ -62,7 +62,7 @@ async function workspace(tenantId, reader) {
 exports.listGmsClients = onCall(options, async request => {
   await identity(request);
   const tenants = await db.collection('tenants').where('demo', '==', false).limit(200).get();
-  const clients = await Promise.all(tenants.docs.map(async tenant => {
+  const clients = await Promise.all(tenants.docs.filter(tenant => tenant.data().workspaceKind !== 'internal').map(async tenant => {
     const record = await tenant.ref.collection('config').doc('onboarding').get();
     const saved = record.data();
     return { tenantId: tenant.id, name: tenant.data().name || tenant.id, industry: tenant.data().industry || '', lifecycle: saved?.lifecycle || 'not_started', revision: saved?.revision || 0 };

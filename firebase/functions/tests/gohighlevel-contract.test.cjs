@@ -12,6 +12,20 @@ test('provider requests use only the server-owned location', () => {
   const result = readRequest('conversations', 'location-gms', { locationId: 'attacker', token: 'secret', path: '/users', limit: 10 });
   assert.equal(result.path, '/conversations/search?locationId=location-gms&limit=10');
 });
+test('program resource reads are finite and location-scoped', () => {
+  for (const resource of ['pipelines', 'workflows', 'forms', 'campaigns']) {
+    const request = readRequest(resource, 'location-gms', { locationId: 'attacker', query: 'ignored', limit: 20 });
+    const url = new URL(request.path, 'https://services.leadconnectorhq.com');
+    assert.equal(url.searchParams.get('locationId'), 'location-gms');
+    assert.equal(url.searchParams.has('query'), false);
+    assert.deepEqual(publicRows(resource, { [resource]: [{ id: 'one', name: 'GMS', secret: 'hidden' }] }, 'location-gms'), [{ id: 'one', name: 'GMS' }]);
+  }
+});
+test('pipeline stages are sanitized and malformed provider rows fail closed', () => {
+  assert.deepEqual(publicRows('pipelines', { pipelines: [{ id: 'one', name: 'Pipeline', stages: [{ id: 'stage-one', name: 'New', credential: 'hidden' }] }] }, 'location-gms'), [{ id: 'one', name: 'Pipeline', stages: [{ id: 'stage-one', name: 'New' }] }]);
+  assert.throws(() => publicRows('workflows', { workflows: [null] }, 'location-gms'));
+  assert.deepEqual(publicRows('forms', { forms: [{ id: 'one', name: { access_token: 'hidden' } }] }, 'location-gms'), [{ id: 'one' }]);
+});
 test('arbitrary endpoints and unsafe IDs are refused', () => {
   for (const value of ['../secrets', '', 'a/b', 'a?locationId=x']) assert.throws(() => identifier(value));
   assert.throws(() => readRequest('sendSMS', 'location-gms'));
