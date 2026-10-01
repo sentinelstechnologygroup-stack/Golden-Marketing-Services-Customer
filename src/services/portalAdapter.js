@@ -134,6 +134,11 @@ const asIso = (value) => {
   if (!value) return null;
   if (typeof value?.toDate === "function") return value.toDate().toISOString();
   if (value instanceof Date) return value.toISOString();
+  const seconds = value?._seconds ?? value?.seconds;
+  if (typeof seconds === "number") {
+    const nanos = value?._nanoseconds ?? value?.nanoseconds ?? 0;
+    return new Date(seconds * 1000 + nanos / 1000000).toISOString();
+  }
   return String(value);
 };
 const normalizeLeadRow = (row) => {
