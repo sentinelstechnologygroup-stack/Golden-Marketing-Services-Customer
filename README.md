@@ -1,6 +1,6 @@
-# Link Marketing Solutions — Customer Portal
+# Golden Marketing Services — Customer Portal
 
-This repository hosts the customer portal frontend for Link Marketing Solutions.
+This repository hosts the customer portal frontend for Golden Marketing Services.
 
 ## Quick start
 

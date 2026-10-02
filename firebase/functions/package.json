@@ -8,7 +8,7 @@
   "scripts": {
     "serve": "firebase emulators:start --only auth,firestore,functions,storage",
     "test:rules": "firebase emulators:exec --only auth,firestore,storage --project demo-linkmarketing-local \"npm run test:rules:raw\"",
-    "test:rules:raw": "node --test tests/*.test.cjs",
+    "test:rules:raw": "node --test --test-concurrency=1 tests/*.test.cjs",
     "provision:golden-cross": "node scripts/provision-golden-cross-beta.cjs",
     "provision:client-supervisor": "node scripts/provision-client-supervisor.cjs",
     "provision:lms-super-admin": "node scripts/provision-lms-super-admin.cjs",

@@ -1,3 +1,4 @@
+import { initializeAppCheck, ReCaptchaEnterpriseProvider } from 'firebase/app-check';
 import { getApp, getApps, initializeApp } from "firebase/app";
 import { connectAuthEmulator, getAuth } from "firebase/auth";
 import { connectFunctionsEmulator, getFunctions } from "firebase/functions";
@@ -30,9 +31,16 @@ export const firebaseConfigured = required.every((key) => Boolean(firebaseConfig
 export const firebaseApp = firebaseConfigured
   ? (getApps().length ? getApp() : initializeApp(firebaseConfig))
   : null;
-// App Check is re-enabled after the new GMS portal domains are registered.
-// Leaving initialization off prevents a stale preview key from blocking Auth.
-export const firebaseAppCheck = null;
+// Configure only after registering the GMS production domains in App Check.
+// A missing key leaves the pre-existing authentication behavior unchanged.
+const appCheckSiteKey = env('VITE_FIREBASE_APPCHECK_SITE_KEY');
+const usingEmulators = import.meta.env.DEV && env('VITE_FIREBASE_USE_EMULATORS') === 'true';
+export const firebaseAppCheck = firebaseApp && env('VITE_FIREBASE_APPCHECK_ENABLED') === 'true' && appCheckSiteKey && !usingEmulators
+  ? initializeAppCheck(firebaseApp, {
+    provider: new ReCaptchaEnterpriseProvider(appCheckSiteKey),
+    isTokenAutoRefreshEnabled: true,
+  })
+  : null;
 export const firebaseAuth = firebaseApp ? getAuth(firebaseApp) : null;
 export const firebaseFunctions = firebaseApp ? getFunctions(firebaseApp, "us-central1") : null;
 export const firebaseDb = firebaseApp ? getFirestore(firebaseApp) : null;

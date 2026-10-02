@@ -4,6 +4,7 @@ const { defineSecret } = require('firebase-functions/params');
 const { HttpsError, onCall } = require('firebase-functions/v2/https');
 const { identifier, readRequest, publicRows, isExampleRow } = require('./gohighlevel-contract.cjs');
 const { connectionVersion } = require('./client-onboarding-policy.cjs');
+const { verifiedContact } = require('./gohighlevel-contact-policy.cjs');
 
 // JSON lives in Secret Manager, NEVER tenant documents, Vite env vars or responses.
 const integrationSecret = defineSecret('GMS_GOHIGHLEVEL_CONFIG');
@@ -136,6 +137,48 @@ exports.readGoHighLevelResource = onCall(callable, async (request) => {
   catch { throw new HttpsError('data-loss', 'Provider response did not match the authorized location.'); }
 });
 
+
+exports.linkGoHighLevelContact = onCall(callable, async (request) => {
+  const { tenantId, leadId, contactId } = request.data || {};
+  await authorize(request, tenantId, true);
+  try { identifier(leadId); identifier(contactId); }
+  catch { throw new HttpsError('invalid-argument', 'Invalid lead or contact.'); }
+  const { connection, revision } = await mappedConnection(tenantId);
+  if (connection.status !== 'connected') throw new HttpsError('failed-precondition', 'Verify the client connection first.');
+  const token = config().locationTokens?.[connection.locationId];
+  if (!token) throw new HttpsError('failed-precondition', 'Location credential is required.');
+  const payload = await api(`/contacts/${contactId}`, token);
+  const leadRef = db.doc(`tenants/${tenantId}/leads/${leadId}`);
+  const mappingRef = db.doc(`gmsProviderContacts/${tenantId}/leads/${leadId}`);
+  const ownerRef = db.doc(`gmsProviderContactOwners/${connection.locationId}/contacts/${contactId}`);
+  await db.runTransaction(async tx => {
+    const [lead, mapping, owner, onboarding, current, locationOwner] = await Promise.all([
+      tx.get(leadRef), tx.get(mappingRef), tx.get(ownerRef),
+      tx.get(db.doc(`tenants/${tenantId}/config/onboarding`)),
+      tx.get(db.doc(`gmsProviderConnections/${tenantId}`)),
+      tx.get(db.doc(`ghlLocationTenants/${connection.locationId}`)),
+    ]);
+    if (!lead.exists) throw new HttpsError('not-found', 'Lead does not exist.');
+    if (onboarding.data()?.revision !== revision || current.data()?.locationId !== connection.locationId
+        || current.data()?.status !== 'connected' || locationOwner.data()?.tenantId !== tenantId) {
+      throw new HttpsError('aborted', 'Client connection changed. Verify it again.');
+    }
+    let verified;
+    try { verified = verifiedContact(payload.contact, lead.data(), connection.locationId, contactId); }
+    catch { throw new HttpsError('failed-precondition', 'Provider contact location and identity must match the saved lead.'); }
+    if ((mapping.exists && (mapping.data().contactId !== contactId || mapping.data().locationId !== connection.locationId))
+        || (owner.exists && (owner.data().tenantId !== tenantId || owner.data().leadId !== leadId))) {
+      throw new HttpsError('already-exists', 'Contact or lead already has a different mapping.');
+    }
+    const now = FieldValue.serverTimestamp();
+    tx.set(mappingRef, { ...verified, tenantId, leadId, verifiedAt: now, actorUid: request.auth.uid });
+    tx.set(ownerRef, { tenantId, leadId, locationId: connection.locationId, contactId, updatedAt: now });
+    tx.set(db.collection(`tenants/${tenantId}/auditLogs`).doc(), {
+      tenantId, actorUid: request.auth.uid, action: 'gohighlevel.contact.linked', target: leadId, occurredAt: now,
+    });
+  });
+  return { status: 'linked', leadId };
+});
 
 exports.connectExistingGoHighLevelLocation = onCall(callable, async (request) => {
   const { tenantId, locationId } = request.data || {};

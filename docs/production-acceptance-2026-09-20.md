@@ -1,4 +1,8 @@
-# LMS production acceptance record
+# Historical production acceptance record — September 2026
+
+> Archived evidence from before the GMS rebrand. This is not the current launch checklist.
+> The retired brand’s domain transfer is not a GMS launch dependency.
+> Use [GMS launch execution checklist](gms-launch-execution.md) for active work.
 
 Date: 2026-09-20
 
@@ -95,12 +99,10 @@ The repeatable export gate is `npm run test:exports`.
 
 No real customer was called or messaged during acceptance testing.
 
-## Domain gate
+## Retired domain gate
 
-The `.com` website and portal names still resolve to Porkbun infrastructure and
-do not provide working HTTPS. The `.co` domains remain primary. Do not redirect
-or switch the `.co` aliases until the `.com` transfer and Vercel domain
-verification are complete.
+The former brand domain-transfer gate is retired and does not apply to GMS.
+Historical deployment aliases below identify past tests only.
 
 ## Rollback procedure
 

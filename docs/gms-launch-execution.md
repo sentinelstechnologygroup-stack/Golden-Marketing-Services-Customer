@@ -1,0 +1,150 @@
+# GMS launch execution checklist
+
+Updated: 2026-10-02. This is the active checklist for Golden Marketing Services.
+Old brand domain transfers are retired and cannot block GMS launch. Historical
+acceptance records identify past releases, not current production readiness.
+
+## Release policy
+
+Complete all five workstreams below. Code completion, emulator acceptance,
+production deployment and live customer acceptance are separate evidence gates.
+A Ready Vercel build or three successful GHL read requests is not full acceptance.
+Record commit SHA, backend revision, test output, production URLs, timestamp and
+redacted provider receipt for every completed production gate.
+
+Preserve layouts, controls, forms, workflows and permanent demos. Do not widen
+permissions, fabricate records, mark missing providers successful, or change an
+agency subscription to satisfy a release gate.
+
+## 1. Retire old brand blockers and establish one shared Firebase backend
+
+- [x] Retire the former domain-transfer gate in the historical acceptance record.
+- [x] Correct the website's default intake origins to the GMS apex and www hosts.
+- [x] Align active frontend package names with GMS and preserve lockfile metadata.
+- [x] Remove four unreferenced former-brand website image assets and one embedded logo module.
+- [x] Correct the GHL checkpoint's stale claim that the module is not exported.
+- [ ] Publish changes and record the resulting deployment identities.
+- [ ] Verify apex/www HTTPS, portal footer links, sitemap/canonicals and no public
+      navigation, consent, contract, email or asset reference to the retired brand.
+- [ ] Review retained Website/history trees separately; referenced historic assets
+      are not dead files and must not be blindly deleted.
+- [ ] Set the cloud project's display name to GMS Platform Production.
+- [ ] Confirm both portals, ingestion, Auth, Firestore, Storage, Functions and
+      Secret Manager use the canonical shared backend below. Inventory reserved
+      projects; do not deploy to them or delete them as a branding fix.
+- [ ] Export a production backup; record rules, indexes, deployed function revisions,
+      authorized Auth domains, redirects, secret names (not values), bucket paths,
+      tenant/brand contracts and rollback points.
+- [ ] Reconcile active GMS domain registration, Firebase Auth templates and provider
+      callback URLs. Historical domain transfers are not a prerequisite.
+
+Canonical backend: `linkmarketing-agent-portal-crm`. The immutable project ID,
+Firebase app IDs, bucket identity, `lmsSuperAdmin` claim, ingestion secret name,
+role aliases and existing tenant keys are compatibility dependencies. Changing
+these strings is a migration, not removal of public branding. Do not split data
+into three projects. Prefer GMS display names while keeping live identities.
+
+## 2. Complete GoHighLevel integration
+
+- [ ] Reverify agency ownership and one-location/one-tenant mapping for each client;
+      distinguish `gms-internal` from paying customer locations.
+- [ ] Install each location-scoped credential server-side and verify granted scopes.
+      No token in Vite env, client documents, browser storage, logs or Git.
+- [ ] Configure the approved GMS pipeline, stages, calendars, timezone, routing,
+      scripts, qualification fields, forms and workflow assets in a clean location.
+- [x] Implement a Super Admin contact-link callable that checks provider location,
+      matching lead email/phone, canonical location ownership and revision races;
+      prevent conflicting lead/contact mappings and write an audit event.
+- [ ] Pass emulator permission/conflict/race tests for contact linkage, deploy the
+      callable first, then enable `VITE_GMS_CONTACT_LINKING_ENABLED=true` in the
+      Agent Portal build and test a live link. The control defaults off.
+- [ ] Implement contact upsert from trusted ingested lead records; persist the
+      provider mapping and reverse ownership. Reconcile duplicate email/phone
+      behavior before retrying. No client-supplied ownership.
+- [ ] Implement calendar availability and appointment creation/update/cancellation;
+      verify timezone, consent, authorized calendar, retry safety and portal sync.
+- [ ] Implement opportunity writes while preserving GMS qualification and billing
+      decisions in Firebase. Provider stage changes cannot create billable handoffs.
+- [ ] Implement conversation history and approved message sending. Enforce channel
+      consent, opt-out/DND, assigned lead, destination and immutable audit evidence.
+- [ ] Implement workflow enrollment against approved workflows; verify write scope
+      availability before expanding credentials. Test duplicate enrollment behavior.
+- [ ] Implement signed webhook receipt using the provider's documented signature
+      mechanism, original body verification, event deduplication, trusted location
+      resolution, immutable ownership, out-of-order events and retry handling.
+- [ ] Add webhook reconciliation, stale sync indicators, safe error/empty/loading
+      states, operational alerts and dead-letter/manual retry handling.
+- [ ] Record parity for each portal screen: live CRM data, editing, notifications,
+      calendar, campaigns, forms and reporting. Reputation is not enabled until
+      its access and implementation are verified; do not display fabricated data.
+- [ ] Test a new client location end-to-end. Manual sub-account creation/linkage is
+      the supported current-plan path; automatic provisioning remains disabled.
+
+Authority: GHL owns CRM activity. Firebase owns identity, tenant/brand permissions,
+qualification, customer approvals, handoff evidence, billing decisions and audit.
+
+## 3. Restore security attestation and verify current permissions
+
+- [x] Add environment-configured reCAPTCHA Enterprise App Check initialization to
+      both portals, with auto-refresh and no stale hardcoded preview key.
+- [ ] Register `agentcrm.goldenmarketingservices.com` and
+      `customer.goldenmarketingservices.com` against the correct Firebase web apps.
+- [ ] Set each portal's `VITE_FIREBASE_APPCHECK_SITE_KEY` and
+      `VITE_FIREBASE_APPCHECK_ENABLED=true`, rebuild, observe valid
+      tokens, then enable server/service enforcement. Do not enforce first and
+      lock users out; do not report enforcement complete while disabled in code.
+- [ ] Audit every callable, including onboarding and GHL, and re-enable enforcement
+      after valid portal tokens are observed. Verify missing/invalid-token denial.
+- [ ] Run Auth/Firestore/Storage and callable permission suites: customer, client
+      admin, supervisor, agent, agent supervisor and GMS Super Admin.
+- [ ] Verify fresh claims, disabled/password-change users, revoked assignments,
+      cross-tenant/brand/lead access, exports, downloads and private provider maps.
+- [ ] Test invitation issuance/delivery/acceptance, password reset, mandatory initial
+      password change, session revocation and intended-route return after login.
+- [ ] Keep invitation-only Agent access; remove privileged test access when finished.
+
+## 4. Verify live communications and complete customer activation
+
+- [ ] Configure approved Twilio credentials, sender number, inbound/voice/status
+      webhooks, agent routing, queues and after-hours behavior in the shared backend.
+- [ ] Verify inbound/outbound calls, client identity, consent announcement, warm
+      transfer, no-answer fallback, recording/transcript and protected downloads.
+- [ ] Configure transactional email and verify sender domain. Test invite, password
+      reset, notification, failure, opt-out and duplicate-delivery behavior.
+- [ ] Configure and test SMS only if part of the approved pilot, including consent,
+      opt-out and delivery status; otherwise explicitly exclude it from activation.
+- [ ] Complete payment-method collection, activation gate, billing cadence, accepted
+      handoff evidence, dispute flow and idempotent billing. Do not charge real
+      customers during a technical acceptance test.
+- [ ] Configure ad-account access and publishing pathway. Verify customer approval
+      hashes, approved creative/scripts, budgets, publishing and paused intake after
+      material edits. Saving a draft does not publish a campaign.
+
+## 5. Complete production acceptance and release
+
+- [ ] Run builds/lint/type checks and focused contracts for all three repositories;
+      run backend emulator suite and customer report exports.
+- [ ] Deploy rules/indexes/storage/backend before dependent portal features. Record
+      immutable release IDs; verify live Functions revision, not just repository code.
+- [ ] Onboard a clearly identified controlled test customer: tenant + GHL location +
+      membership + invitation + campaign/brand + agent assignment + consent policy +
+      routing + customer approval + verified communications/payment prerequisites.
+- [ ] Submit a GMS website inquiry; verify trusted ownership, contact sync, Agent
+      visibility, qualification, handoff/appointment, customer acceptance, reports,
+      notification and billing evidence, with no unauthorized duplicate actions.
+- [ ] Test refresh/bookmark/deep links, expired sessions, mobile sidebar/tables/forms,
+      loading/empty/error states, downloads and consent-aware retries.
+- [ ] Verify GA4/conversion events and source attribution without exposing protected
+      lead data; review search metadata and obsolete public URLs.
+- [ ] Scan logs for errors and secret/PII leaks, test provider failure/recovery and
+      demonstrate rollback without deleting tenant records or permanent demos.
+- [ ] Publish a new GMS acceptance record with passed/failed/blocked results. Open
+      customer activation only when the required gates above have live evidence.
+
+## Access constraint in this execution environment
+
+Repository access is available. No authenticated Firebase/gcloud deployment
+credential or provider-management connector was present during this pass. Live
+secret changes, Firebase deployment, account setup and real communications cannot
+be completed here without the relevant authenticated access. This is an access
+constraint, not a request for renewed approval or an old-domain blocker.

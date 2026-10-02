@@ -1,67 +1,33 @@
-# LMS Firebase production architecture
+# GMS shared Firebase architecture
 
-## Canonical production backend
+The canonical backend is `linkmarketing-agent-portal-crm`, with one Firebase Auth
+user directory, Firestore database, Storage bucket and Functions deployment.
+The project ID and bucket name are retained compatibility identities.
+Desired display name: **GMS Platform Production**; cloud configuration still needs
+an authenticated verification pass.
 
-- Google Cloud display name: `LinkMarketing Platform Prod`
-- Firebase project ID: `linkmarketing-agent-portal-crm`
-- Firestore location: `nam5`
-- Storage bucket: `linkmarketing-agent-portal-crm.firebasestorage.app`
-- Authentication: one shared Firebase Authentication user directory
-
-Google Cloud limits project display names to 30 characters, so the console uses
-`LinkMarketing Platform Prod` rather than the longer requested name
-`LinkMarketing Platform Production`. The immutable project ID is retained.
-
-## Registered web applications
-
-| Application | Firebase app ID | App Check domain |
+| Application | Firebase web app ID | Current production host |
 | --- | --- | --- |
-| LMS Website | `1:1089114348316:web:8af2519a66cdddafc778d9` | `linkmarketingservices.co` |
-| LMS Customer Portal | `1:1089114348316:web:6d1cf9944ca6ef1cc778d9` | `customer.linkmarketingservices.co` |
-| LMS Agent CRM | `1:1089114348316:web:8df2b05d88d1df8cc778d9` | `agent.linkmarketingservices.co` |
+| GMS Website | `1:1089114348316:web:8af2519a66cdddafc778d9` | `www.goldenmarketingservices.com` |
+| GMS Customer Portal | `1:1089114348316:web:6d1cf9944ca6ef1cc778d9` | `customer.goldenmarketingservices.com` |
+| GMS Agent CRM | `1:1089114348316:web:8df2b05d88d1df8cc778d9` | `agentcrm.goldenmarketingservices.com` |
 
-The corresponding `.com` domains are also authorized so the transfer can be
-completed without recreating App Check keys.
+These hosts are required registration targets, not a claim that Auth/App Check
+registration has been verified in the cloud. Both portals can initialize
+reCAPTCHA Enterprise using `VITE_FIREBASE_APPCHECK_SITE_KEY` plus
+`VITE_FIREBASE_APPCHECK_ENABLED=true`; register the hosts,
+observe valid tokens and then enforce. The GHL callable boundary currently has
+App Check enforcement disabled. Prior acceptance of old hosts is historical.
 
-## Security boundaries
+Tenant membership, agent/brand assignment, fresh server-verified claims, immutable
+ownership, Firestore/Storage rules and audit enforce authorization. Browser tenant
+IDs and provider location IDs never grant access. Private provider mappings remain
+outside tenant wildcard rules. GHL owns CRM activity; Firebase owns identity,
+permissions, qualification, customer approvals, billing evidence and audit.
 
-Separate Firebase web applications identify the browser clients. They do not
-replace authorization. Access is enforced by tenant memberships, Agent
-assignments, Brand restrictions, immutable ownership fields, Firestore rules,
-Storage rules, callable Function authorization, and audit records.
+Reserved projects `linkmarketing-customer-portal` and `linkmarketing-website` are
+not production targets. Their inventory/state requires authenticated verification;
+do not switch runtime configuration to them or delete them as a branding fix.
 
-- Customer users enter through `tenants/{tenantId}/members/{uid}`.
-- Agent users enter through `agentUsers/{uid}/assignments/{tenantId}`.
-- LMS Super Admin authority is server-verified and audited.
-- Browser-supplied tenant, Brand, role, and ownership changes cannot grant access.
-- Storage remains partitioned under tenant-owned paths.
-
-## Function boundaries
-
-- `website-ingestion.js`: server-authorized public lead intake.
-- `agent-operations.js`: assigned Agent CRM reads, writes, and communications.
-- `customer-operations.js`: tenant-member portal operations.
-- `platform-administration.js`: provisioning, assignments, policy, projections,
-  asset registration, and health administration.
-- `platform-core.js`: canonical shared implementation and authorization helpers.
-
-## App Check rollout
-
-All three web apps are registered with domain-restricted reCAPTCHA Enterprise
-providers. Portal clients initialize App Check and automatically refresh tokens
-when their application-specific site key is present.
-
-Production monitoring confirmed valid attestation from both Customer and Agent
-browser sessions. Baseline App Check enforcement is enabled for Authentication,
-Firestore, Storage, and every callable Function. The Website's current lead flow
-remains server-to-server and is protected by route credentials, origin checks,
-rate limiting, consent validation, and server-side tenant routing.
-
-## Reserved projects
-
-- `linkmarketing-customer-portal`: display name `LMS Customer Reserved`
-- `linkmarketing-website`: display name `LMS Website Reserved`
-
-These projects contain no production LMS data and must not be selected for
-production deployments. They are retained only to prevent accidental reuse or
-confusion. Do not delete them without explicit approval.
+See [GMS launch execution checklist](gms-launch-execution.md). Retired brand domain
+transfers do not apply to this release.

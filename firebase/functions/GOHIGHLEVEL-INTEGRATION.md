@@ -44,13 +44,11 @@ Official API documentation says automatic location creation requires Agency Pro
 ($497). Existing/manual sub-account linkage is the current-plan implementation
 path. Do not upgrade the agency without a separate user decision.
 
-## Local implementation (not deployed or live-connected)
+## Connector implementation — current source
 
-`gohighlevel-operations.js` defines five Firebase callables. It is deliberately
-not exported by `index.js`. The agency credential is now configured, but the
-location credential is also installed. Canonical onboarding mapping
-reconciliation, authorization tests and portal adapters must be completed before
-these callables go live.
+`gohighlevel-operations.js` is exported by `index.js`. The checkpoint below
+records prior live read evidence, not acceptance of all CRM capabilities.
+Use `docs/gms-launch-execution.md` for the current release gates.
 
 - `getGoHighLevelConnection`: Super Admin status, without credentials.
 - `connectExistingGoHighLevelLocation`: verifies agency ownership and records a
@@ -62,7 +60,7 @@ these callables go live.
   before marking the connection connected. This does NOT imply all GHL features
   or snapshot import completion have been verified.
 - `readGoHighLevelResource`: finite, read-only conversations/calendars/opportunities
-  calls. Full-tenant administrators only until brand-level filtering is added.
+  calls. Full-tenant administrators can read location resources; assigned agents can read only mapped lead conversations.
 
 Provider configuration is the server-side Secret Manager secret
 `GMS_GOHIGHLEVEL_CONFIG`, JSON containing `companyId`, `agencyToken`,

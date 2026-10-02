@@ -29,6 +29,7 @@ test('fresh roles, tenant isolation, canonical ownership and provider response f
   global.fetch = async url => {
     requests++;
     const path = new URL(url).pathname;
+    if (path.startsWith('/contacts/')) return { ok: true, json: async () => ({ contact: { id: 'contact-one', locationId: wrongLocation ? 'another-location' : 'location-test', email: 'lead@example.test' } }) };
     if (path.startsWith('/locations/')) return { ok: true, json: async () => ({ location: { id: 'location-test', companyId: 'agency-test' } }) };
     if (alterSettings) await db.doc(`tenants/${tenantId}/config/onboarding`).update({ revision: 2 });
     const key = path.includes('conversations') ? 'conversations' : path.includes('calendars') ? 'calendars' : 'opportunities';
@@ -50,9 +51,15 @@ test('fresh roles, tenant isolation, canonical ownership and provider response f
     assert.equal(readiness.ghlVerified, true); assert.equal(readiness.phoneVerified, false);
     const result = await functions.readGoHighLevelResource.run(call(ids.customer, { tenantId, resource: 'calendars', locationId: 'attacker' }));
     assert.deepEqual(result.items, [{ id: 'record-one', name: 'Emulator only' }]);
-    await db.doc(`tenants/${tenantId}/leads/lead-one`).set({ brandId: 'brand-one', assignedTo: ids.agent });
+    await db.doc(`tenants/${tenantId}/leads/lead-one`).set({ brandId: 'brand-one', assignedTo: ids.agent, email: 'lead@example.test' });
     await assert.rejects(functions.readGoHighLevelResource.run(call(ids.agent, { tenantId, resource: 'conversations', leadId: 'lead-one' })), { code: 'failed-precondition' });
-    await db.doc(`gmsProviderContacts/${tenantId}/leads/lead-one`).set({ locationId: 'location-test', contactId: 'contact-one' });
+    await assert.rejects(functions.linkGoHighLevelContact.run(call(ids.agent, { tenantId, leadId: 'lead-one', contactId: 'contact-one' })), { code: 'permission-denied' });
+    wrongLocation = true;
+    await assert.rejects(functions.linkGoHighLevelContact.run(call(ids.admin, { tenantId, leadId: 'lead-one', contactId: 'contact-one' })), { code: 'failed-precondition' });
+    wrongLocation = false;
+    await functions.linkGoHighLevelContact.run(call(ids.admin, { tenantId, leadId: 'lead-one', contactId: 'contact-one' }));
+    await db.doc(`tenants/${tenantId}/leads/lead-two`).set({ email: 'lead@example.test' });
+    await assert.rejects(functions.linkGoHighLevelContact.run(call(ids.admin, { tenantId, leadId: 'lead-two', contactId: 'contact-one' })), { code: 'already-exists' });
     const agentResult = await functions.readGoHighLevelResource.run(call(ids.agent, { tenantId, resource: 'conversations', leadId: 'lead-one', contactId: 'attacker' }));
     assert.equal(agentResult.items[0].contactId, 'contact-one');
     await db.doc(`tenants/${tenantId}/leads/lead-one`).update({ assignedTo: ids.outsider });
