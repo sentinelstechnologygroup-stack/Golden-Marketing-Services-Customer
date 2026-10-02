@@ -13,7 +13,7 @@ const asBuffer = async (blob) => Buffer.from(await blob.arrayBuffer());
 const assertArtifact = async ({ blob, filename }, extension, mimeType, signature) => {
   assert.ok(blob instanceof Blob, `${extension} export must return a Blob`);
   assert.equal(blob.type, mimeType, `${extension} export must use the expected MIME type`);
-  assert.match(filename, new RegExp(`^link-marketing-performance-.+-\\d{4}-\\d{2}-\\d{2}\\.${extension}$`));
+  assert.match(filename, new RegExp(`^golden-marketing-services-performance-.+-\\d{4}-\\d{2}-\\d{2}\\.${extension}$`));
   const bytes = await asBuffer(blob);
   assert.ok(bytes.length > 100, `${extension} export must contain a real document`);
   assert.equal(bytes.subarray(0, signature.length).toString("binary"), signature, `${extension} export signature is invalid`);
@@ -28,7 +28,7 @@ const csv = createReportCsv({
   ],
 });
 assert.equal(csv.blob.type, "text/csv;charset=utf-8");
-assert.match(csv.filename, /^link-marketing-performance-.+-\d{4}-\d{2}-\d{2}\.csv$/);
+assert.match(csv.filename, /^golden-marketing-services-performance-.+-\d{4}-\d{2}-\d{2}\.csv$/);
 const csvText = await csv.blob.text();
 assert.ok(csvText.startsWith("\"Section\",\"Record\",\"Metric\",\"Value\""));
 assert.ok(csvText.includes("Lead Volume"));

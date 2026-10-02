@@ -30,7 +30,20 @@
 | Customer | `540f2ddbbda14a692844e67aa35c6f188391e426` | `dpl_CpQx1XBXQRd2F2MNFtrt2eNgJJPA` | READY |
 | Agent | `bc9e08d5c926b95e6bc60b6397a6f82f1426ce92` | `dpl_4s7QDiNWHRBnSzQNWGbgh6Ljz787` | READY |
 
-Backend source is pushed; a Vercel frontend build does not deploy Firebase Functions. This session has no authenticated Firebase/gcloud deployment credentials or provider-management connector. No production backend change, real call/message, payment charge, subscription change or provider write was made during this pass.
+Backend source is pushed; a Vercel frontend build does not deploy Firebase Functions. No authenticated local Firebase/gcloud deployment credential is available; Firebase Console is authenticated, while Google Cloud Console and Cloud Shell remain unavailable. No production backend change, real call/message, payment charge, subscription change or provider write was made during this pass.
+
+## Live cloud configuration follow-through
+
+- Renamed the existing shared cloud project display name to GMS Platform Production, and the three existing web app nicknames to GMS Agent CRM, GMS Customer Portal and GMS Website. Immutable project/app/bucket identities remain unchanged.
+- Removed five retired custom Firebase Auth domains: linkmarketingservices.com, www.linkmarketingservices.com, customer.linkmarketingservices.com, link-marketing-solutions-customer.vercel.app and link-marketing-solutions-agent.vercel.app. Verified the final list contains the two GMS portal domains, localhost and the two Firebase default domains.
+- Verified weekly Sunday backups with 98-day retention. Daily backups are not enabled and PITR is off. Backup object availability, export and restore have not been verified.
+- Attempted GMS sender/subject changes for verification, password reset, email change and MFA notices. Firebase rejected saves with "Email template updates are currently unavailable for this project"; inspected password reset after save and found default content. No template success is claimed.
+- Verified all three web apps are registered with Fraud Defense/reCAPTCHA Enterprise. GMS key-domain restrictions could not be inspected because Google Cloud Console is unavailable.
+- App Check services: Storage Enforced; Firestore Enforced with 0% verified/100% unverified requests displayed; Authentication Monitoring with 8%/92%. These metrics need live-token investigation before activation. Callable enforcement is still disabled in the relevant source.
+- Inspected both pages of the 50-function live inventory: existing GHL reads/connect/verify callables are deployed, but linkGoHighLevelContact is absent. verifyGoHighLevelConnection shows deployed 9/30/26 8:59 PM, nodejs22, 256 MiB. Cloud revision identifiers remain unverified.
+- GHL is signed out. The secure sign-in request was interrupted; it was not repeated.
+- Google Cloud Console and embedded Cloud Shell return Site Unavailable. One ordinary Cloud Console reload did not recover access.
+- Corrected the remaining public old-brand report download filename to golden-marketing-services-performance; CSV/XLSX/DOCX/PDF and empty-report checks passed again.
 
 ## Remaining required work
 

@@ -45,7 +45,7 @@ function buildReportSections(data) {
 function reportFilename(data, extension) {
   const period = String(data.range || "report").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
   const date = new Date().toISOString().slice(0, 10);
-  return `link-marketing-performance-${period || "report"}-${date}.${extension}`;
+  return `golden-marketing-services-performance-${period || "report"}-${date}.${extension}`;
 }
 
 function downloadBlob(blob, filename) {

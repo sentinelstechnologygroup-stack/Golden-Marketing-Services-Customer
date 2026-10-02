@@ -23,12 +23,15 @@ agency subscription to satisfy a release gate.
 - [x] Align active frontend package names with GMS and preserve lockfile metadata.
 - [x] Remove four unreferenced former-brand website image assets and one embedded logo module.
 - [x] Correct the GHL checkpoint's stale claim that the module is not exported.
-- [ ] Publish changes and record the resulting deployment identities.
+- [x] Publish frontend changes and record the resulting deployment identities.
 - [ ] Verify apex/www HTTPS, portal footer links, sitemap/canonicals and no public
       navigation, consent, contract, email or asset reference to the retired brand.
 - [ ] Review retained Website/history trees separately; referenced historic assets
       are not dead files and must not be blindly deleted.
-- [ ] Set the cloud project's display name to GMS Platform Production.
+- [x] Set the cloud project's display name to GMS Platform Production.
+- [x] Rename all three registered web apps to GMS Agent CRM, GMS Customer Portal and GMS Website.
+- [x] Remove retired LMS custom authorized Auth domains; preserve both GMS portal domains and Firebase default identities.
+- [x] Verify existing weekly Sunday backups with 98-day retention. PITR is off; actual backup availability and restore validation remain pending.
 - [ ] Confirm both portals, ingestion, Auth, Firestore, Storage, Functions and
       Secret Manager use the canonical shared backend below. Inventory reserved
       projects; do not deploy to them or delete them as a branding fix.
@@ -122,7 +125,7 @@ qualification, customer approvals, handoff evidence, billing decisions and audit
 
 ## 5. Complete production acceptance and release
 
-- [ ] Run builds/lint/type checks and focused contracts for all three repositories;
+- [x] Run builds/lint/type checks and focused contracts for all three repositories;
       run backend emulator suite and customer report exports.
 - [ ] Deploy rules/indexes/storage/backend before dependent portal features. Record
       immutable release IDs; verify live Functions revision, not just repository code.
@@ -141,10 +144,49 @@ qualification, customer approvals, handoff evidence, billing decisions and audit
 - [ ] Publish a new GMS acceptance record with passed/failed/blocked results. Open
       customer activation only when the required gates above have live evidence.
 
-## Access constraint in this execution environment
+## Live findings and access constraints — 2026-10-02
 
-Repository access is available. No authenticated Firebase/gcloud deployment
-credential or provider-management connector was present during this pass. Live
-secret changes, Firebase deployment, account setup and real communications cannot
-be completed here without the relevant authenticated access. This is an access
-constraint, not a request for renewed approval or an old-domain blocker.
+Firebase Console is authenticated and its configuration changes above are
+verified. Google Cloud Console and embedded Cloud Shell show Site Unavailable,
+including after one Cloud Console reload. No authenticated local Firebase/gcloud
+deployment credential is available. The existing GHL tab is signed out; its
+secure sign-in request was interrupted and was not repeated.
+
+Firebase rejected Auth template saves: "Email template updates are currently
+unavailable for this project." Sender and subject branding did not persist.
+Resolve that vendor/project restriction; retain the current functional action
+handler until a GMS handler is implemented and tested.
+
+All three Firebase web apps are already registered with Fraud Defense (formerly
+reCAPTCHA Enterprise). Registration alone does not verify allowed GMS domains.
+Storage and Firestore are already Enforced; Firestore displayed 0% verified and
+100% unverified requests. Authentication is Monitoring (8%/92%). These are
+console metrics, not an end-to-end access test. Verify domain restrictions and
+valid portal tokens urgently; do not disable enforcement to mask the issue.
+
+The console lists 50 deployed v2 Functions in us-central1. Existing GHL reads and
+connection verification are deployed. The new linkGoHighLevelContact callable is
+absent. verifyGoHighLevelConnection displayed deployed 9/30/26 8:59 PM, nodejs22,
+256 MiB; that is a console timestamp, not an immutable revision identifier.
+
+Backend deployment, backup export/restore validation, attestation domain setup,
+provider administration and live acceptance remain blocked by these specific
+access boundaries. This is not a request for renewed approval or an old-domain
+blocker.
+
+## Next-pass order and evidence
+
+| Order | Concrete work | Completion evidence |
+| --- | --- | --- |
+| 1A | Restore Google Cloud deployment access and a signed-in GHL session; inventory backend revisions, secret metadata and backup objects. | Authenticated access, immutable revision IDs, successful production export and isolated restore validation. |
+| 1B | Resolve Firebase template update restriction; verify GMS sender domain and callbacks. Finish public old-brand scan, retaining technical identities and permanent demos. | Persisted templates, delivered reset/invite emails and correct return routes; zero obsolete public branding. |
+| 2A | Complete trusted contact upsert, appointment CRUD and opportunity writes with private mappings, scope checks, revision checks, audit and retry reconciliation. | Emulator denial/duplicate tests plus provider receipts and matching Firebase/GHL records. |
+| 2B | Complete consent-aware messaging, approved workflow enrollment, raw-body signed webhook validation, deduplication, ordering and reconciliation. | Delivery/workflow receipts, invalid-signature denial, duplicate-event no-op and failure/recovery evidence. |
+| 3 | Verify existing attestation keys allow GMS hosts, configure portal keys/enabled flags, observe valid tokens, deploy callable enforcement and exercise every role boundary. | Valid tokens; missing/invalid-token and cross-tenant/brand denials; successful authorized customer/agent journeys. Existing Firestore/Storage enforcement stays in place. |
+| 4 | Activate approved calling/email, payment prerequisites and approved campaign publishing. | Call/email receipts, customer approval hash, payment-method readiness, published campaign ID and budget evidence. |
+| 5 | Run a controlled customer intake → qualification → handoff → acceptance → billing-evidence journey; exercise retries and rollback. | Linked record IDs, redacted provider receipts, immutable approval/acceptance/billing audit and signed-off production acceptance record. |
+
+Steps 2A/2B are implementation work, not merely credential setup. Step 3 must
+pass before activating customer traffic. Steps 4/5 require an identified
+controlled pilot and customer-approved campaign details. A mock run cannot
+certify new-customer readiness.
