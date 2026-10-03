@@ -6,7 +6,7 @@ function selectedProvider(value) {
   return value;
 }
 function required(config, keys) {
-  for (const key of keys) if (!config[key] || config[key] === 'not-configured') throw new Error(`Missing telephony configuration: ${key}`);
+  for (const key of keys) if (!String(config[key] || '').trim() || String(config[key]).trim() === 'not-configured') throw new Error(`Missing telephony configuration: ${key}`);
 }
 function xml(value) { return String(value).replace(/[<>&"']/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;',"'":'&apos;'}[c])); }
 function createProvider(name, config, transport = fetch) {

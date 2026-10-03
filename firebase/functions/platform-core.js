@@ -771,7 +771,7 @@ exports.communications = onCall({ enforceAppCheck: true, secrets: [twilioAccount
   const { caller, assignment } = await requireAgentAssignment(request, tenantId, roles);
   if (!['health_check', 'start_call', 'bind_call', 'end_call', 'hold_call', 'resume_call', 'warm_transfer', 'claim_lead', 'release_lead', 'set_availability', 'start_consultation', 'complete_transfer', 'cancel_transfer', 'mute_call', 'browser_session', 'send_sms', 'start_recording', 'call_status'].includes(action)) throw new HttpsError('invalid-argument', 'Unsupported communications action.');
   if (action === 'health_check') {
-    try { const provider = phoneProvider(); return {ok:true, configured:true, healthy:process.env.TELEPHONY_ENABLED==='true', mode:process.env.TELEPHONY_ENABLED==='true'?'production':'unavailable', provider:provider.name, recordingPolicy:process.env.DEFAULT_RECORDING_POLICY || 'record_on_consent', actorUid:caller.uid}; }
+    try { const provider = phoneProvider(); const issues = require('./telephony/readiness.cjs').configurationIssues(process.env); const healthy = process.env.TELEPHONY_ENABLED === 'true' && issues.length === 0; return {ok:true, configured:issues.length===0, healthy, mode:healthy?'production':'unavailable', provider:provider.name, recordingPolicy:process.env.DEFAULT_RECORDING_POLICY || 'record_on_consent', warmTransferEnabled:healthy && process.env.TELEPHONY_WARM_TRANSFER_ENABLED==='true', actorUid:caller.uid, ...(!healthy?{warning:'Calling is awaiting verified phone-service configuration.'}:{})}; }
     catch { return {ok:true,configured:false,healthy:false,mode:'unavailable',warning:'Calling is awaiting phone-service configuration.'}; }
   }
   if (action === 'set_availability') {
@@ -797,6 +797,8 @@ exports.communications = onCall({ enforceAppCheck: true, secrets: [twilioAccount
     return {ok:true,leadId:params.leadId};
   }
   if (process.env.TELEPHONY_ENABLED !== 'true') throw new HttpsError('failed-precondition','Calling has not been activated.');
+  if (require('./telephony/readiness.cjs').configurationIssues(process.env).length) throw new HttpsError('failed-precondition','Phone-service configuration has not passed activation checks.');
+  if (['warm_transfer','start_consultation','complete_transfer','cancel_transfer'].includes(action) && process.env.TELEPHONY_WARM_TRANSFER_ENABLED !== 'true') throw new HttpsError('failed-precondition','Warm transfer has not passed end-to-end verification.');
   let provider;
   try { provider = phoneProvider(); } catch { throw new HttpsError('failed-precondition', 'Phone service is not configured.'); }
   if(action==='browser_session') {
@@ -816,14 +818,10 @@ exports.communications = onCall({ enforceAppCheck: true, secrets: [twilioAccount
     if(action==='call_status') return {ok:true,callId:callSid,status:call.status,browserState:call.browserState || null,transferStatus:call.transferStatus || null,recordingStatus:call.recordingStatus || null};
     if(provider.name!=='telnyx') throw new HttpsError('failed-precondition','Browser call binding is only used by the selected phone service.');
     if(typeof params.browserCallId!=='string' || !params.browserCallId || typeof params.providerCallId!=='string' || !params.providerCallId) throw new HttpsError('invalid-argument','Provider call identifiers are required.');
-    if(call.providerCallId && call.providerCallId!==params.providerCallId) throw new HttpsError('already-exists','This call is already bound to a different provider call.');
-    await ref.update({providerCallId:params.providerCallId,browserCallId:params.browserCallId,providerSessionId:params.providerSessionId || null,providerLegId:params.providerLegId || null,browserState:params.state || null,status:params.state==='active'?'in_progress':call.status,updatedAt:FieldValue.serverTimestamp()});
-    if(call.recordingRequested && !call.recordingStatus) {
-      await ref.update({recordingStatus:'starting',updatedAt:FieldValue.serverTimestamp()});
-      try { await provider.record(params.providerCallId,true); await ref.update({recordingStatus:'recording',updatedAt:FieldValue.serverTimestamp()}); }
-      catch(error) { await ref.update({recordingStatus:'failed',updatedAt:FieldValue.serverTimestamp()}); throw new HttpsError('internal','The call connected, but recording could not start.'); }
-    }
-    return {ok:true,callId:callSid,status:params.state || call.status};
+    if(!call.providerCallId) throw new HttpsError('failed-precondition','Awaiting a verified provider webhook.');
+    if(call.providerCallId!==params.providerCallId) throw new HttpsError('permission-denied','Provider call does not match the verified webhook.');
+    await ref.update({browserCallId:params.browserCallId,browserState:String(params.state || '').slice(0,40),updatedAt:FieldValue.serverTimestamp()});
+    return {ok:true,callId:callSid,status:call.status};
   }
   if (['start_consultation','complete_transfer','cancel_transfer','mute_call', 'send_sms', 'start_recording'].includes(action)) {
     const ref = db.doc(`tenants/${tenantId}/callRecords/${callSid}`);
@@ -880,7 +878,9 @@ exports.communications = onCall({ enforceAppCheck: true, secrets: [twilioAccount
       throw new HttpsError('permission-denied', 'The call destination must match the authorized lead phone.');
     }
     const numbers = await db.collection(`tenants/${tenantId}/phoneNumbers`).where('brandId','==',brandId).get();
-    const number = numbers.docs.map(doc=>doc.data()).find(row=>row.status==='active' && row.provider===provider.name);
+    let number;
+    try { number = require('./telephony/readiness.cjs').selectOutboundNumber(numbers.docs.map(doc=>doc.data()),provider.name,leadData.campaignId || leadData.campaign_id); }
+    catch { throw new HttpsError('failed-precondition','Configure one active outbound number for this Brand or campaign.'); }
     if (!number?.phoneNumber) throw new HttpsError('failed-precondition','Configure an active client phone number for the selected provider.');
     if (leadData.disposition==='do_not_call' || leadData.doNotCall===true) throw new HttpsError('failed-precondition','This contact cannot be called.');
     const brandSnapshot=await db.doc(`tenants/${tenantId}/brands/${brandId}`).get();
@@ -890,7 +890,7 @@ exports.communications = onCall({ enforceAppCheck: true, secrets: [twilioAccount
     const leadRef=leadSnapshot.ref;
     await db.runTransaction(async tx=>{
       const latest=await tx.get(leadRef); const value=latest.data();
-      if(value.queueOwnerUid!==caller.uid || value.activeCallId || value.callStartPending) throw new HttpsError('already-exists','A call is already active or starting.');
+      if(!value || value.queueOwnerUid!==caller.uid || (value.queueLeaseExpiresAt?.toMillis?.() || 0)<Date.now() || value.activeCallId || value.callStartPending) throw new HttpsError('already-exists','The lead lease expired or a call is already active or starting.');
       tx.update(leadRef,{callStartPending:true,callStartRequestedAt:FieldValue.serverTimestamp()});
     });
     // On ambiguous network failure retain pending state: a supervisor must reconcile
@@ -905,7 +905,7 @@ exports.communications = onCall({ enforceAppCheck: true, secrets: [twilioAccount
     }
     callRef = db.doc(`tenants/${tenantId}/callRecords/${callId}`);
     await callRef.set({
-      tenantId, brandId, leadId, agentUid: caller.uid, provider: provider.name, providerCallId: provider.name==='telnyx'?null:callId,
+      tenantId, brandId, campaignId:leadData.campaignId || leadData.campaign_id || null, leadId, agentUid: caller.uid, provider: provider.name, providerCallId: provider.name==='telnyx'?null:callId,
       clientContactId: leadData.routedClientContactId || null,
       from:number.phoneNumber, direction: 'outbound', destination: String(params.to).slice(0, 80), status: result.status || 'queued',
       recordingPolicy, recordingConsent:params.recordingConsent===true, recordingRequested:recordingPolicy!=='do_not_record', recordingStatus:null,
@@ -986,7 +986,9 @@ function phoneWebhook(providerName, secrets) {
     let matches=snapshots.docs, consultation=false;
     if(!matches.length && providerName==='telnyx' && event.gmsCallId && event.tenantId && !event.gmsCallId.includes('/') && !event.tenantId.includes('/')) {
       const candidate=await db.doc(`tenants/${event.tenantId}/callRecords/${event.gmsCallId}`).get();
-      if(candidate.exists && candidate.data().provider==='telnyx') matches=[candidate];
+      if(candidate.exists && candidate.data().provider==='telnyx' && !candidate.data().providerCallId &&
+        candidate.data().tenantId===event.tenantId && event.connectionId===process.env.TELNYX_CONNECTION_ID &&
+        normalizedPhone(event.from)===normalizedPhone(candidate.data().from) && normalizedPhone(event.to)===normalizedPhone(candidate.data().destination)) matches=[candidate];
     }
     if(!matches.length) { const other=await db.collectionGroup('callRecords').where('provider','==',providerName).where('consultationCallId','==',event.callId).limit(2).get(); matches=other.docs; consultation=true; }
     if(matches.length!==1) return response.status(202).send('No uniquely mapped call');
@@ -995,11 +997,12 @@ function phoneWebhook(providerName, secrets) {
       const eventRef=ref.collection('providerEvents').doc(event.id);
       const [seen,current]=await Promise.all([tx.get(eventRef),tx.get(ref)]);
       if(seen.exists) return;
+      if(!consultation && current.data().providerCallId && current.data().providerCallId!==event.callId) throw new Error('Conflicting provider call binding');
       const patch={updatedAt:FieldValue.serverTimestamp()};
       if(!consultation && !current.data().providerCallId && event.callId) patch.providerCallId=event.callId;
       if(consultation) { if(event.answered) patch.consultationStatus='answered'; else if(event.status==='completed') patch.consultationStatus='completed'; }
       else if(statusCanAdvance(current.data().status,event.status)) patch.status=event.status;
-      if(event.recordingUrl) patch.recordingUrl=event.recordingUrl;
+      if(event.recordingUrl && require('./telephony/readiness.cjs').recordingAllowed(current.data())) { patch.recordingUrl=event.recordingUrl; patch.recordingStatus='saved'; }
       if(!consultation && event.status==='completed') patch.endedAt=FieldValue.serverTimestamp();
       if(!consultation && ['completed','failed','busy','no-answer','canceled'].includes(event.status) && current.data().leadId) {
         const leadRef=db.doc(`tenants/${current.data().tenantId}/leads/${current.data().leadId}`);
@@ -1009,9 +1012,22 @@ function phoneWebhook(providerName, secrets) {
       tx.create(eventRef,{provider:providerName,eventType:event.eventType || 'unknown',receivedAt:FieldValue.serverTimestamp()});
       tx.update(ref,patch);
     });
+    // Only a signed answered event can trigger recording. Browser state and
+    // browser-supplied provider identifiers cannot initiate this operation.
+    if(providerName==='telnyx' && event.answered && !consultation && process.env.TELEPHONY_ENABLED==='true') {
+      const shouldRecord=await db.runTransaction(async tx=>{
+        const current=await tx.get(ref), call=current.data();
+        if(!call || call.providerCallId!==event.callId || call.status!=='in_progress' || call.recordingStatus || !require('./telephony/readiness.cjs').recordingAllowed(call)) return false;
+        tx.update(ref,{recordingStatus:'starting'}); return true;
+      });
+      if(shouldRecord) {
+        try { await phoneProvider().record(event.callId,true); await ref.update({recordingStatus:'recording'}); }
+        catch { await ref.update({recordingStatus:'failed'}); }
+      }
+    }
     return response.status(200).send('Accepted');
   });
 }
 exports.twilioWebhook=phoneWebhook('twilio',[twilioAuthToken]);
-exports.telnyxWebhook=phoneWebhook('telnyx',[]);
+exports.telnyxWebhook=phoneWebhook('telnyx',[telnyxApiKey]);
 exports.signalwireWebhook=phoneWebhook('signalwire',[signalwireToken]);

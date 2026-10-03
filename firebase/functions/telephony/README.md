@@ -46,6 +46,22 @@ TELNYX_PUBLIC_KEY, SIGNALWIRE_PROJECT_ID, SIGNALWIRE_SPACE_URL.
 Use provider-specific canonical *_STATUS_WEBHOOK_URL values for validation.
 The SignalWire space must be HTTPS at a *.signalwire.com origin.
 
+Telnyx activation also requires `TELNYX_DIALING_RESTRICTIONS_VERIFIED=true`.
+Leave it false until account-level restrictions or a server-controlled media
+workflow prevents SDK token holders from dialing arbitrary destinations or
+choosing another tenant's caller ID. A browser dial instruction alone does
+not establish this boundary. `TELEPHONY_WARM_TRANSFER_ENABLED` defaults off;
+enable it only after the conference and recording-continuity test passes.
+Signed answered webhooks initiate recording using the stored consent policy.
+Browser call binding records UI state only after a signed webhook has mapped
+the provider call; it cannot authorize recording or replace that mapping.
+
+Deploy from the existing Firebase configuration directory:
+`cd firebase && firebase deploy --project linkmarketing-agent-portal-crm --only functions:communications,functions:telnyxWebhook,firestore:indexes`.
+Keep the ignored project environment file's `TELEPHONY_ENABLED=false` during
+setup. Missing API secrets can use the literal `not-configured` for a disabled
+deployment; that placeholder is never a working credential or readiness proof.
+
 Active number records use existing tenants/{tenantId}/phoneNumbers fields:
 brandId, phoneNumber (E.164), provider, status='active'.
 Agent assignment provisioning adds telnyxCredentialId or
