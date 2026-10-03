@@ -231,7 +231,7 @@ exports.verifyGoHighLevelConnection = onCall(callable, async (request) => {
         || connectionVersion(onboarding.data()?.data || {}) !== connectionVersion(data)
         || owner.data()?.tenantId !== tenantId) throw new HttpsError('aborted', 'Client settings changed. Run the connection check again.');
     tx.update(ref, { status: 'connected', verifiedResources: checks, verifiedAt: FieldValue.serverTimestamp() });
-    // CRM verification cannot verify Twilio or make an old phone proof fresh.
+    // CRM verification cannot verify Telnyx or make an old phone proof fresh.
     tx.set(db.doc(`tenants/${tenantId}/integrations/readiness`), {
       configHash: connectionVersion(data), ghlVerified: true, phoneVerified: false, verifiedAtMs: Date.now(),
     });

@@ -1,92 +1,35 @@
-# GMS call-center integration
+# GMS Telnyx integration
 
-One TELEPHONY_PROVIDER (`twilio`, `telnyx`, or `signalwire`) is selected globally.
-TELEPHONY_ENABLED defaults to false. No automatic failover, parallel phone
-systems, provider console redirects, or provider branding in agent controls.
+Telnyx is the only production phone provider. TELEPHONY_ENABLED defaults to
+false and TELEPHONY_WARM_TRANSFER_ENABLED stays false until conferencing and
+recording continuity after agent departure pass an end-to-end test.
 
-## Implemented
+Store TELNYX_API_KEY only in Google Secret Manager. Server configuration uses
+TELNYX_CONNECTION_ID, TELNYX_PUBLIC_KEY, TELNYX_STATUS_WEBHOOK_URL,
+TELEPHONY_STATUS_URL and DEFAULT_RECORDING_POLICY=record_on_consent.
+A disabled deployment can use the literal not-configured for the API secret;
+this is not a working credential or proof of readiness.
 
-- Provider REST adapters: outbound initiation, end, conference create/join,
-  participant hold/unhold/mute/remove, recording start, SMS initiation.
-- Browser credentials: authenticated Firebase callable issues Twilio voice JWT,
-  Telnyx telephony-credential token, or SignalWire subscriber token. Identity is
-  server-derived, with credentials in memory only in the browser.
-- Telnyx outbound browser calls: the server reserves the authorized lead,
-  selects the active number for its tenant and Brand, and returns a correlated
-  dial instruction. The browser supplies the agent audio while signed Telnyx
-  webhooks bind provider identifiers and status back to the CRM call record.
-- Brand recording policy is enforced before dialing. Approved Telnyx calls can
-  start dual-channel recording after the provider call is bound; recording
-  status and saved URLs are exposed in the tenant-isolated Customer Portal.
-- Lead claim/release uses a Firestore transaction and a two-minute renewable lease.
-  Call initiation reserves the lead; ambiguous provider failures stay pending for
-  reconciliation instead of retrying a potentially successful paid call.
-- Availability is stored per authorized agent assignment.
-- Consult, cancel, and complete handoff validate the routed customer contact on
-  the server. Complete requires an answered consultation callback. Completion
-  request is not claimed as a completed customer handoff.
-- Provider webhook signatures are checked against canonical configured URLs;
-  Telnyx additionally checks timestamp freshness. Events deduplicate under the
-  call record and terminal status does not regress. Consultation answers are
-  correlated by the consultation leg identifier, not browser assertions.
-- SMS requires verified stored consent and respects opt-out flags.
-- Recording requires an authorized brand policy and explicit consent when needed.
+Onboarding stores telnyxPhoneNumberId and an E.164 phoneNumber, with provider
+set to telnyx. Draft identifiers remain unverified. Purchased numbers must be
+verified against Telnyx before activation, and assigned under the correct
+tenants/{tenantId}/phoneNumbers record and brandId. Campaign-specific numbers
+take precedence; ambiguous assignments reject dialing.
 
-## Configuration
+Agent assignment telnyxCredentialId stays server-side. Only short-lived calling
+tokens enter browser memory. Browser state cannot authorize provider call
+binding or recording. Signed webhooks correlate a matching connection, tenant,
+number and destination; recording requires the stored policy and consent.
 
-Secret Manager: TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_API_KEY_SECRET,
-TELNYX_API_KEY, SIGNALWIRE_API_TOKEN. The existing callable binds all five;
-unused values must be provisioned as `not-configured` until deployment is split
-into provider-specific callables. Never put these values in VITE variables.
+TELNYX_DIALING_RESTRICTIONS_VERIFIED stays false until provider-side restrictions
+or a server-controlled media workflow prevent SDK token holders from dialing
+arbitrary destinations or choosing another tenant's caller ID. A server-selected
+browser dial instruction alone does not establish this security boundary.
 
-Server environment: TELEPHONY_PROVIDER, TELEPHONY_ENABLED,
-TELEPHONY_VOICE_URL, TELEPHONY_STATUS_URL, TELEPHONY_CONSULTATION_URL,
-TWILIO_API_KEY_SID, TWILIO_TWIML_APP_SID, TELNYX_CONNECTION_ID,
-TELNYX_PUBLIC_KEY, SIGNALWIRE_PROJECT_ID, SIGNALWIRE_SPACE_URL.
-Use provider-specific canonical *_STATUS_WEBHOOK_URL values for validation.
-The SignalWire space must be HTTPS at a *.signalwire.com origin.
+Deploy from firebase/firebase.json using the production project
+linkmarketing-agent-portal-crm. If Firebase CLI login fails, gcloud can deploy
+these same second-generation functions. Keep calling disabled during deployment.
 
-Telnyx activation also requires `TELNYX_DIALING_RESTRICTIONS_VERIFIED=true`.
-Leave it false until account-level restrictions or a server-controlled media
-workflow prevents SDK token holders from dialing arbitrary destinations or
-choosing another tenant's caller ID. A browser dial instruction alone does
-not establish this boundary. `TELEPHONY_WARM_TRANSFER_ENABLED` defaults off;
-enable it only after the conference and recording-continuity test passes.
-Signed answered webhooks initiate recording using the stored consent policy.
-Browser call binding records UI state only after a signed webhook has mapped
-the provider call; it cannot authorize recording or replace that mapping.
-
-Deploy from the existing Firebase configuration directory:
-`cd firebase && firebase deploy --project linkmarketing-agent-portal-crm --only functions:communications,functions:telnyxWebhook,firestore:indexes`.
-Keep the ignored project environment file's `TELEPHONY_ENABLED=false` during
-setup. Missing API secrets can use the literal `not-configured` for a disabled
-deployment; that placeholder is never a working credential or readiness proof.
-
-Active number records use existing tenants/{tenantId}/phoneNumbers fields:
-brandId, phoneNumber (E.164), provider, status='active'.
-Agent assignment provisioning adds telnyxCredentialId or
-signalwireSubscriberReference. Never accept these from the browser.
-Deploy the callRecords collection-group indexes before webhook activation.
-
-## Still required before live activation
-
-This change is a development integration, not a certified complete phone system.
-The Telnyx outbound agent-to-prospect media path is connected through the WebRTC
-SDK. Warm consultation and handoff still require an account-specific conference
-workflow that persists conferenceId/agentCallId and routes consultation audio
-privately before handoff.
-Twilio/SignalWire compatibility conference commands and SignalWire Fabric
-browser calls must be explicitly linked by the account's voice application;
-Fabric identifiers must not be assumed to equal Compatibility API identifiers.
-
-Inbound number-to-tenant mapping, shared incoming-call dispatch and timeout
-requeue, voicemail capture, delivery-status/opt-out SMS webhooks, token refresh,
-transcription and GHL evidence synchronization are not completed by these
-adapters. They must be implemented and verified before TELEPHONY_ENABLED=true.
-Keep the activation gate off until those backend paths are complete. There is
-no automatic claim of readiness from a nonempty provider API key.
-
-Validation: node --test firebase/functions/tests/telephony-adapters.test.cjs;
-Agent npm run build, npm run test:contract, npm run lint. Credential-free tests
-validate transports, signature rejection, replay protection and token identity.
-Real audio/queue/transfer acceptance requires a selected configured provider.
+Inbound dispatch, voicemail, SMS delivery/opt-out callbacks, token refresh,
+transcription and conference handoff still require separate implementation and
+validation. Do not infer readiness from successful builds or an API key.

@@ -108,7 +108,7 @@ qualification, customer approvals, handoff evidence, billing decisions and audit
 
 ## 4. Verify live communications and complete customer activation
 
-- [ ] Configure approved Twilio credentials, sender number, inbound/voice/status
+- [ ] Configure approved Telnyx credentials, sender number, inbound/voice/status
       webhooks, agent routing, queues and after-hours behavior in the shared backend.
 - [ ] Verify inbound/outbound calls, client identity, consent announcement, warm
       transfer, no-answer fallback, recording/transcript and protected downloads.

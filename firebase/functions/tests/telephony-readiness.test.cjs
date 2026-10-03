@@ -31,5 +31,5 @@ test('campaign numbers take precedence and ambiguity fails closed', () => {
   assert.equal(selectOutboundNumber([brand,campaign],'telnyx','campaign-b'),brand);
   assert.throws(()=>selectOutboundNumber([brand,{...brand}],'telnyx'));
   assert.throws(()=>selectOutboundNumber([campaign],'telnyx','campaign-b'));
-  assert.throws(()=>selectOutboundNumber([brand],'twilio'));
+  assert.throws(()=>selectOutboundNumber([brand],'legacy'));
 });

@@ -12,7 +12,7 @@ function normalize(input = {}) {
     domain: text(input.domain, 300), address: text(input.address, 500), industry: text(input.industry, 100),
     timezone: text(input.timezone, 80) || 'America/Chicago', brandName: text(input.brandName, 200),
     locationId: text(input.locationId, 100), phoneNumber: text(input.phoneNumber, 30),
-    phoneSid: text(input.phoneSid, 100), billingNotes: text(input.billingNotes, 2000), notes: text(input.notes, 4000),
+    telnyxPhoneNumberId: text(input.telnyxPhoneNumberId, 100), billingNotes: text(input.billingNotes, 2000), notes: text(input.notes, 4000),
     campaigns: (Array.isArray(input.campaigns) ? input.campaigns : []).slice(0, 12).map(c => ({
       id: id(c.id).toLowerCase(), name: text(c.name, 200), type: text(c.type, 100), source: text(c.source, 200),
       calendarId: text(c.calendarId, 100), pipelineId: text(c.pipelineId, 100),
@@ -27,20 +27,20 @@ function normalize(input = {}) {
   if (data.adminEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.adminEmail)) throw new Error('Enter a valid client administrator email.');
   if (data.phoneNumber && !/^\+[1-9]\d{7,14}$/.test(data.phoneNumber)) throw new Error('Use international phone format, for example +13125551234.');
   if (data.locationId && !/^[a-zA-Z0-9_-]+$/.test(data.locationId)) throw new Error('Invalid GoHighLevel location ID.');
-  if (data.phoneSid && !/^PN[a-fA-F0-9]{32}$/.test(data.phoneSid)) throw new Error('Invalid Twilio phone number SID.');
+  if (data.telnyxPhoneNumberId && !/^[0-9]{1,30}$/.test(data.telnyxPhoneNumberId)) throw new Error('Invalid Telnyx phone number ID.');
   try { new Intl.DateTimeFormat('en', { timeZone: data.timezone }); } catch { throw new Error('Enter a valid time zone.'); }
   if (new Set(data.campaigns.map(c => c.id)).size !== data.campaigns.length) throw new Error('Campaign identifiers must be unique.');
   return data;
 }
 const digest = value => crypto.createHash('sha256').update(JSON.stringify(value)).digest('hex');
 const campaignVersion = campaign => digest(campaign);
-const connectionVersion = data => digest({ locationId: data.locationId, phoneNumber: data.phoneNumber, phoneSid: data.phoneSid });
+const connectionVersion = data => digest({ locationId: data.locationId, phoneNumber: data.phoneNumber, telnyxPhoneNumberId: data.telnyxPhoneNumberId });
 function readiness(data, { connections = {}, membershipReady = false, approvals = {}, agentsReady = false, documentsReady = false, now = Date.now() } = {}) {
   const verified = connections.configHash === connectionVersion(data) && connections.verifiedAtMs > now - 86400000 && connections.verifiedAtMs <= now;
   const checks = [
     { key: 'profile', label: 'Client profile', ready: Boolean(data.name && data.brandName && data.industry && data.adminEmail) },
     { key: 'ghl', label: 'GoHighLevel connection verified by backend', ready: Boolean(data.locationId && verified && connections.ghlVerified) },
-    { key: 'phone', label: 'Phone connection verified by backend', ready: Boolean(data.phoneNumber && data.phoneSid && verified && connections.phoneVerified) },
+    { key: 'phone', label: 'Phone connection verified by backend', ready: Boolean(data.phoneNumber && data.telnyxPhoneNumberId && verified && connections.phoneVerified) },
     { key: 'membership', label: 'Customer portal membership', ready: membershipReady },
     { key: 'campaigns', label: 'Campaigns, scripts, qualification and consent', ready: data.campaigns.length > 0 && data.campaigns.every(c => c.name && c.type && c.source && c.script && c.qualification && c.consent && c.adCopy) },
     { key: 'agents', label: 'Active campaign-specific agents', ready: data.campaigns.length > 0 && agentsReady && data.campaigns.every(c => c.agentUids.length > 0) },

@@ -81,7 +81,7 @@ Callable authorization rechecks the Firebase user and server-owned membership.
 ## Deliberately untouched
 
 Existing portal layouts, authentication, qualification/handoff decisions,
-billing/evidence, Twilio configuration, customer records and production domains.
+billing/evidence, Telnyx configuration, customer records and production domains.
 No new CRM schema, fixture data, public GoHighLevel login, outbound messages,
 phone-number purchase or subscription activation.
 

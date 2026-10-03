@@ -19,7 +19,7 @@ async function main() {
       name: 'Golden Marketing Services', legalName: 'Golden Marketing Services', brandName: 'Golden Marketing Services',
       industry: 'marketing-agency', phone: '+12532226335', domain: 'https://goldenmarketingservices.com',
       address: '26029 Dobbin Huffsmith Rd, Magnolia, TX 77354', timezone: 'America/Chicago',
-      adminEmail: '', locationId, phoneNumber: '', phoneSid: '', campaigns: [],
+      adminEmail: '', locationId, phoneNumber: '', telnyxPhoneNumberId: '', campaigns: [],
       notes: 'GMS internal operations workspace. No customer login, fixture records or campaign intake provisioned.',
     } }));
   }

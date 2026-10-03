@@ -11,15 +11,11 @@ setGlobalOptions({ region: 'us-central1', maxInstances: 10 });
 
 const db = getFirestore();
 const auth = getAuth();
-const twilioAccountSid = defineSecret('TWILIO_ACCOUNT_SID');
-const twilioAuthToken = defineSecret('TWILIO_AUTH_TOKEN');
 const telnyxApiKey = defineSecret('TELNYX_API_KEY');
-const signalwireToken = defineSecret('SIGNALWIRE_API_TOKEN');
-const twilioKeySecret = defineSecret('TWILIO_API_KEY_SECRET');
 const { createProvider, selectedProvider } = require('./telephony/providers.cjs');
 function phoneProvider() {
-  const name = selectedProvider(process.env.TELEPHONY_PROVIDER || 'twilio');
-  return createProvider(name, name === 'twilio' ? {accountId:twilioAccountSid.value(),token:twilioAuthToken.value()} : name === 'telnyx' ? {token:telnyxApiKey.value(),connectionId:process.env.TELNYX_CONNECTION_ID} : {accountId:process.env.SIGNALWIRE_PROJECT_ID,token:signalwireToken.value(),spaceUrl:process.env.SIGNALWIRE_SPACE_URL});
+  const name = selectedProvider(process.env.TELEPHONY_PROVIDER || 'telnyx');
+  return createProvider(name, {token:telnyxApiKey.value(),connectionId:process.env.TELNYX_CONNECTION_ID});
 }
 
 const ROLE_ALIASES = new Map([
@@ -92,28 +88,6 @@ function writeRolesFor(collectionName) {
   if (ADMIN_WRITE_COLLECTIONS.has(collectionName)) return TENANT_ADMIN_ROLES;
   if (AGENT_WRITE_COLLECTIONS.has(collectionName)) return [...TENANT_ADMIN_ROLES, 'agent'];
   return [];
-}
-
-function twilioConfigured() {
-  const sid = String(twilioAccountSid.value() || '').trim();
-  const token = String(twilioAuthToken.value() || '').trim();
-  return Boolean(sid && token && sid !== 'not-configured' && token !== 'not-configured');
-}
-
-async function twilioRequest(path, method = 'POST', params = {}) {
-  if (!twilioConfigured()) throw new HttpsError('failed-precondition', 'Telephony is not configured.');
-  const accountSid = twilioAccountSid.value();
-  const authToken = twilioAuthToken.value();
-  const body = new URLSearchParams(params);
-  const credentials = Buffer.from(`${accountSid}:${authToken}`).toString('base64');
-  const response = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${accountSid}${path}`, {
-    method,
-    headers: { Authorization: `Basic ${credentials}`, 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: method === 'GET' ? undefined : body,
-  });
-  const payload = await response.json().catch(() => ({}));
-  if (!response.ok) throw new HttpsError('internal', payload.message || 'Telephony provider request failed.');
-  return payload;
 }
 
 function requireAuth(request) {
@@ -763,7 +737,7 @@ exports.appointmentWorkflow = onCall({ enforceAppCheck: true }, async (request) 
   return result;
 });
 
-exports.communications = onCall({ enforceAppCheck: true, secrets: [twilioAccountSid, twilioAuthToken, telnyxApiKey, signalwireToken, twilioKeySecret] }, async (request) => {
+exports.communications = onCall({ enforceAppCheck: true, secrets: [telnyxApiKey] }, async (request) => {
   const { tenantId, action, params = {}, adminCheck = false } = request.data || {};
   if (typeof tenantId!=='string' || !tenantId || tenantId.includes('/')) throw new HttpsError('invalid-argument','Invalid tenant.');
   for (const id of [params.callId,params.leadId]) if (id !== undefined && (typeof id!=='string' || !id || id.includes('/'))) throw new HttpsError('invalid-argument','Invalid record identifier.');
@@ -805,7 +779,7 @@ exports.communications = onCall({ enforceAppCheck: true, secrets: [twilioAccount
     const provision=await db.doc(`agentUsers/${caller.uid}/assignments/${tenantId}`).get();
     const {browserSession}=require('./telephony/browser-session.cjs');
     const name=provider.name;
-    const config=name==='twilio'?{accountId:twilioAccountSid.value(),keyId:process.env.TWILIO_API_KEY_SID,keySecret:twilioKeySecret.value(),applicationId:process.env.TWILIO_TWIML_APP_SID}:name==='telnyx'?{token:telnyxApiKey.value()}:{token:signalwireToken.value(),accountId:process.env.SIGNALWIRE_PROJECT_ID,spaceUrl:process.env.SIGNALWIRE_SPACE_URL};
+    const config={token:telnyxApiKey.value()};
     try { return await browserSession(name,config,`gms_${caller.uid}`,provision.data() || {}); } catch { throw new HttpsError('failed-precondition','Agent browser calling is not provisioned.'); }
   }
   const callSid = typeof params.callId === 'string' ? params.callId : '';
@@ -975,10 +949,10 @@ const { normalizeEvent, statusCanAdvance } = require('./telephony/events.cjs');
 function phoneWebhook(providerName, secrets) {
   return onRequest({cors:false,secrets},async(request,response)=>{
     if(request.method!=='POST') return response.status(405).send('Method not allowed');
-    const config = providerName==='twilio'?{token:twilioAuthToken.value()}:providerName==='signalwire'?{token:signalwireToken.value()}:{publicKey:process.env.TELNYX_PUBLIC_KEY};
+    const config = {publicKey:process.env.TELNYX_PUBLIC_KEY};
     const canonicalUrl=process.env[`${providerName.toUpperCase()}_STATUS_WEBHOOK_URL`];
     const rawBody=request.rawBody || Buffer.from(JSON.stringify(request.body || {}));
-    const valid=verifySignature(providerName,{url:canonicalUrl,body:request.body || {},rawBody,signature:request.get(providerName==='telnyx'?'telnyx-signature-ed25519':providerName==='signalwire'?'x-signalwire-signature':'x-twilio-signature') || '',timestamp:request.get('telnyx-timestamp')},config);
+    const valid=verifySignature(providerName,{url:canonicalUrl,body:request.body || {},rawBody,signature:request.get('telnyx-signature-ed25519') || '',timestamp:request.get('telnyx-timestamp')},config);
     if(!valid) return response.status(403).send('Invalid signature');
     const event=normalizeEvent(providerName,request.body || {},rawBody);
     if(!event.callId) return response.status(400).send('Missing call identifier');
@@ -1028,6 +1002,4 @@ function phoneWebhook(providerName, secrets) {
     return response.status(200).send('Accepted');
   });
 }
-exports.twilioWebhook=phoneWebhook('twilio',[twilioAuthToken]);
 exports.telnyxWebhook=phoneWebhook('telnyx',[telnyxApiKey]);
-exports.signalwireWebhook=phoneWebhook('signalwire',[signalwireToken]);

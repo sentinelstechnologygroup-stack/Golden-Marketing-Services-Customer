@@ -1,7 +1,7 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const p = require('../client-onboarding-policy.cjs');
-const form = () => p.normalize({ name: 'Test client', brandName: 'Test brand', adminEmail: 'client@example.com', industry: 'services', locationId: 'location-one', phoneNumber: '+13125551234', phoneSid: `PN${'a'.repeat(32)}`, campaigns: [{ id: 'campaign-one', name: 'Service', type: 'search', source: 'Search ads', agentUids: ['agent-one'], script: 'Script', qualification: 'Question', consent: 'Consent', adCopy: 'Ad', documentIds: ['creative-one'] }] });
+const form = () => p.normalize({ name: 'Test client', brandName: 'Test brand', adminEmail: 'client@example.com', industry: 'services', locationId: 'location-one', phoneNumber: '+13125551234', telnyxPhoneNumberId: '123456789012345678', campaigns: [{ id: 'campaign-one', name: 'Service', type: 'search', source: 'Search ads', agentUids: ['agent-one'], script: 'Script', qualification: 'Question', consent: 'Consent', adCopy: 'Ad', documentIds: ['creative-one'] }] });
 const evidence = data => ({ connections: { configHash: p.connectionVersion(data), verifiedAtMs: Date.now()-1000, ghlVerified: true, phoneVerified: true }, membershipReady: true, agentsReady: true, documentsReady: true, approvals: { 'campaign-one': { status: 'approved', version: p.campaignVersion(data.campaigns[0]) } } });
 test('identifiers and phone inputs reject path traversal / invalid numbers', () => {
   assert.throws(() => p.id('../other-client'));

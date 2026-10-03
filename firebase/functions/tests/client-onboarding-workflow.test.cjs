@@ -14,7 +14,7 @@ test('draft -> projections -> client approval -> gated routing; isolated tenants
   await auth.createUser({uid:adminUid,email:`${prefix}-admin@example.test`});
   await auth.setCustomUserClaims(adminUid,{lmsSuperAdmin:true});
   await auth.createUser({uid:clientUid,email:`${prefix}-customer@example.test`});
-  const data = {name:'Emulator client',brandName:'Emulator brand',industry:'services',adminEmail:`${prefix}-customer@example.test`,locationId:`location-${prefix}`,phoneNumber:'+13125551234',phoneSid:`PN${'a'.repeat(32)}`,campaigns:[]};
+  const data = {name:'Emulator client',brandName:'Emulator brand',industry:'services',adminEmail:`${prefix}-customer@example.test`,locationId:`location-${prefix}`,phoneNumber:'+13125551234',telnyxPhoneNumberId:'123456789012345678',campaigns:[]};
   const initial = await functions.saveGmsClient.run(call(adminUid,{clientId:tenantId,create:true,revision:0,data}));
   assert.equal(initial.revision,1); assert.equal(initial.lifecycle,'draft'); assert.equal(initial.readiness.ready,false);
   await assert.rejects(functions.saveGmsClient.run(call(clientUid,{clientId:tenantId,revision:1,data})),{code:'permission-denied'});

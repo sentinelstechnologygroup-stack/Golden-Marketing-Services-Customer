@@ -54,7 +54,7 @@ async function workspace(tenantId, reader) {
     documentsReady: (data.campaigns || []).every(c => c.documentIds?.every(id => availableDocs.includes(id))),
   });
   return {
-    tenantId, data: reader.admin ? data : { ...data, notes: '', billingNotes: '', adminEmail: '', phoneSid: '' }, revision: saved?.revision || 0, lifecycle: saved?.lifecycle || 'not_started', readiness,
+    tenantId, data: reader.admin ? data : { ...data, notes: '', billingNotes: '', adminEmail: '', telnyxPhoneNumberId: '' }, revision: saved?.revision || 0, lifecycle: saved?.lifecycle || 'not_started', readiness,
     approvals: approvalMap, campaignVersions: Object.fromEntries((data.campaigns || []).map(c => [c.id, policy.campaignVersion(c)])), documents: plain(documents).filter(doc => doc.archived !== true).map(doc => ({ id: doc.id, name: doc.name, category: doc.category, storagePath: doc.storagePath })),
     ...(reader.admin ? { activeAgents } : {}),
   };
@@ -165,7 +165,7 @@ exports.saveGmsClient = onCall(options, async request => {
       tx.set(root.collection('routingRules').doc(c.id), { tenantId, brandId, name: c.name, priority: 1, conditions: [{ field: 'campaignId', operator: 'equals', value: c.id }], destination: { type: 'agent_rotation', agentUids: c.agentUids }, status: 'paused', managedBy: 'onboarding', updatedAt: now }, { merge: true });
       tx.set(db.doc(`ingestionRoutes/${routeKey}`), { tenantId, brandId, industryId: data.industry || 'general', campaignId: c.id, sourceId: c.id, routingProfileId: c.id, scriptSetId: c.id, qualificationFormId: c.id, consentPolicyId: `${tenantId}-consent`, retentionPolicyId: `${tenantId}-retention`, workflowVersion: 'gms-onboarding-v1', assignedAgentUids: c.agentUids, locationId: data.locationId, consentPolicy: { text: c.consent, requireConsent: true }, retentionPolicy: { retentionDays: 2555 }, notificationProfile: { channels: ['in_app'] }, status: 'paused', managedBy: 'onboarding', updatedAt: now }, { merge: true });
     }
-    if (data.phoneNumber) tx.set(root.collection('phoneNumbers').doc('onboarding'), { tenantId, brandId, phoneNumber: data.phoneNumber, phoneSid: data.phoneSid, provider: 'twilio', status: 'unverified', assignedTo: null, managedBy: 'onboarding', updatedAt: now }, { merge: true });
+    if (data.phoneNumber) tx.set(root.collection('phoneNumbers').doc('onboarding'), { tenantId, brandId, phoneNumber: data.phoneNumber, telnyxPhoneNumberId: data.telnyxPhoneNumberId, provider: 'telnyx', status: 'unverified', assignedTo: null, managedBy: 'onboarding', updatedAt: now }, { merge: true });
     if (memberRef) {
       tx.set(memberRef, { tenantId, uid: clientUser.uid, email: data.adminEmail, role: 'client_admin', active: true, updatedAt: now }, { merge: true });
       tx.set(root.collection('businessOwners').doc(`onboarding-${clientUser.uid}`), { tenantId, brandId, uid:clientUser.uid, memberUid:clientUser.uid, name:clientUser.displayName || `${data.name} administrator`, email:data.adminEmail, phone:data.phone, roleType:'client_contact', routingEligible:Boolean(data.phone), status:'active', managedBy:'onboarding', updatedAt:now }, { merge:true });

@@ -18,7 +18,7 @@ test('fresh roles, tenant isolation, canonical ownership and provider response f
   }
   await auth.setCustomUserClaims(ids.admin, { lmsSuperAdmin: true });
   await auth.setCustomUserClaims(ids.password, { lmsSuperAdmin: true, mustChangePassword: true });
-  const data = { locationId: 'location-test', phoneNumber: '', phoneSid: '' };
+  const data = { locationId: 'location-test', phoneNumber: '', telnyxPhoneNumberId: '' };
   await db.doc(`tenants/${tenantId}`).set({ environment: 'production', demo: false });
   await db.doc(`tenants/${tenantId}/config/onboarding`).set({ data, revision: 1 });
   await db.doc('ghlLocationTenants/location-test').set({ tenantId });
