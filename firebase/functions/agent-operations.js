@@ -8,4 +8,6 @@ module.exports = {
   appointmentWorkflow: core.appointmentWorkflow,
   communications: core.communications,
   twilioWebhook: core.twilioWebhook,
+  telnyxWebhook: core.telnyxWebhook,
+  signalwireWebhook: core.signalwireWebhook,
 };
