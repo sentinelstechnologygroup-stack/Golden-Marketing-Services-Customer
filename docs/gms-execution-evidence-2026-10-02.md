@@ -48,3 +48,4 @@ Backend source is pushed; a Vercel frontend build does not deploy Firebase Funct
 ## Remaining required work
 
 [The active GMS execution checklist](gms-launch-execution.md) maps all remaining steps and acceptance criteria. GHL contact upsert, appointment/opportunity writes, message sending, workflow enrollment and signed replay-safe synchronization remain implementation work. Correct cloud App Check registration/enforcement, live telephony/email, payment activation, ad publishing and a real controlled new-customer journey remain unverified. The full platform is not yet certified ready to receive new customers.
+
