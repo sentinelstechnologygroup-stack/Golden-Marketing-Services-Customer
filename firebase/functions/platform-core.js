@@ -13,6 +13,15 @@ const db = getFirestore();
 const auth = getAuth();
 const twilioAccountSid = defineSecret('TWILIO_ACCOUNT_SID');
 const twilioAuthToken = defineSecret('TWILIO_AUTH_TOKEN');
+const telnyxApiKey = defineSecret('TELNYX_API_KEY');
+const signalwireToken = defineSecret('SIGNALWIRE_API_TOKEN');
+const twilioKeySecret = defineSecret('TWILIO_API_KEY_SECRET');
+const { createProvider, selectedProvider } = require('./telephony/providers.cjs');
+function phoneProvider() {
+  const name = selectedProvider(process.env.TELEPHONY_PROVIDER || 'twilio');
+  return createProvider(name, name === 'twilio' ? {accountId:twilioAccountSid.value(),token:twilioAuthToken.value()} : name === 'telnyx' ? {token:telnyxApiKey.value(),connectionId:process.env.TELNYX_CONNECTION_ID} : {accountId:process.env.SIGNALWIRE_PROJECT_ID,token:signalwireToken.value(),spaceUrl:process.env.SIGNALWIRE_SPACE_URL});
+}
+
 const ROLE_ALIASES = new Map([
   ['customer', 'client'],
   ['admin', 'client_admin'],
@@ -523,7 +532,7 @@ function averageResponseMinutes(leads) {
 exports.getCustomerCollection = onCall({ enforceAppCheck: false }, async (request) => {
   const { tenantId, collectionName } = request.data || {};
   const { membership } = await requireMembership(request, tenantId, ['client', 'client_admin', 'client_supervisor', 'lms_super_admin']);
-  if (!['leads', 'appointments', 'billing', 'invoices', 'documents', 'supportRequests'].includes(collectionName)) {
+  if (!['leads', 'callRecords', 'appointments', 'billing', 'invoices', 'documents', 'supportRequests'].includes(collectionName)) {
     throw new HttpsError('invalid-argument', 'Collection is not available to the customer portal.');
   }
   const snapshot = await db.collection(`tenants/${tenantId}/${collectionName}`).where('tenantId', '==', tenantId).limit(250).get();
@@ -754,14 +763,106 @@ exports.appointmentWorkflow = onCall({ enforceAppCheck: true }, async (request) 
   return result;
 });
 
-exports.communications = onCall({ enforceAppCheck: true, secrets: [twilioAccountSid, twilioAuthToken] }, async (request) => {
+exports.communications = onCall({ enforceAppCheck: true, secrets: [twilioAccountSid, twilioAuthToken, telnyxApiKey, signalwireToken, twilioKeySecret] }, async (request) => {
   const { tenantId, action, params = {}, adminCheck = false } = request.data || {};
+  if (typeof tenantId!=='string' || !tenantId || tenantId.includes('/')) throw new HttpsError('invalid-argument','Invalid tenant.');
+  for (const id of [params.callId,params.leadId]) if (id !== undefined && (typeof id!=='string' || !id || id.includes('/'))) throw new HttpsError('invalid-argument','Invalid record identifier.');
   const roles = adminCheck ? ['admin', 'supervisor'] : ['admin', 'supervisor', 'agent'];
   const { caller, assignment } = await requireAgentAssignment(request, tenantId, roles);
-  if (!['health_check', 'start_call', 'end_call', 'hold_call', 'resume_call', 'warm_transfer'].includes(action)) throw new HttpsError('invalid-argument', 'Unsupported communications action.');
-  if (action === 'health_check') return { ok: true, configured: twilioConfigured(), provider: 'twilio', actorUid: caller.uid };
+  if (!['health_check', 'start_call', 'bind_call', 'end_call', 'hold_call', 'resume_call', 'warm_transfer', 'claim_lead', 'release_lead', 'set_availability', 'start_consultation', 'complete_transfer', 'cancel_transfer', 'mute_call', 'browser_session', 'send_sms', 'start_recording', 'call_status'].includes(action)) throw new HttpsError('invalid-argument', 'Unsupported communications action.');
+  if (action === 'health_check') {
+    try { const provider = phoneProvider(); return {ok:true, configured:true, healthy:process.env.TELEPHONY_ENABLED==='true', mode:process.env.TELEPHONY_ENABLED==='true'?'production':'unavailable', provider:provider.name, recordingPolicy:process.env.DEFAULT_RECORDING_POLICY || 'record_on_consent', actorUid:caller.uid}; }
+    catch { return {ok:true,configured:false,healthy:false,mode:'unavailable',warning:'Calling is awaiting phone-service configuration.'}; }
+  }
+  if (action === 'set_availability') {
+    if (!['offline','available','away','after_call_work'].includes(params.status)) throw new HttpsError('invalid-argument','Invalid availability.');
+    await db.doc(`agentUsers/${caller.uid}/assignments/${tenantId}`).set({agentStatus:params.status,presenceUpdatedAt:FieldValue.serverTimestamp()},{merge:true});
+    return {ok:true,status:params.status};
+  }
+  if (action === 'claim_lead' || action === 'release_lead') {
+    if (typeof params.leadId !== 'string' || !params.leadId || params.leadId.includes('/')) throw new HttpsError('invalid-argument','A lead is required.');
+    const ref = db.doc(`tenants/${tenantId}/leads/${params.leadId}`);
+    await db.runTransaction(async tx => {
+      const snapshot = await tx.get(ref);
+      if (!snapshot.exists || snapshot.data().tenantId!==tenantId) throw new HttpsError('not-found','Lead not found.');
+      const lead = snapshot.data(); requireAssignmentBrand(assignment,recordBrandId(lead));
+      const owner = lead.queueOwnerUid;
+      const expires = lead.queueLeaseExpiresAt?.toMillis?.() || 0;
+      if (owner && owner!==caller.uid && expires>Date.now()) throw new HttpsError('already-exists','Another agent accepted this request.');
+      if (lead.activeCallId || lead.callStartPending) throw new HttpsError('failed-precondition','This lead has an active call or pending call request.');
+      if (action==='release_lead' && owner!==caller.uid) throw new HttpsError('permission-denied','Only the accepting agent can release this request.');
+      tx.update(ref,{queueOwnerUid:action==='claim_lead'?caller.uid:null,queueLeaseExpiresAt:action==='claim_lead'?new Date(Date.now()+120000):null,updatedAt:FieldValue.serverTimestamp()});
+    });
+    await recordAudit({tenantId,actorUid:caller.uid,action:`telephony.${action}`,target:params.leadId});
+    return {ok:true,leadId:params.leadId};
+  }
+  if (process.env.TELEPHONY_ENABLED !== 'true') throw new HttpsError('failed-precondition','Calling has not been activated.');
+  let provider;
+  try { provider = phoneProvider(); } catch { throw new HttpsError('failed-precondition', 'Phone service is not configured.'); }
+  if(action==='browser_session') {
+    const provision=await db.doc(`agentUsers/${caller.uid}/assignments/${tenantId}`).get();
+    const {browserSession}=require('./telephony/browser-session.cjs');
+    const name=provider.name;
+    const config=name==='twilio'?{accountId:twilioAccountSid.value(),keyId:process.env.TWILIO_API_KEY_SID,keySecret:twilioKeySecret.value(),applicationId:process.env.TWILIO_TWIML_APP_SID}:name==='telnyx'?{token:telnyxApiKey.value()}:{token:signalwireToken.value(),accountId:process.env.SIGNALWIRE_PROJECT_ID,spaceUrl:process.env.SIGNALWIRE_SPACE_URL};
+    try { return await browserSession(name,config,`gms_${caller.uid}`,provision.data() || {}); } catch { throw new HttpsError('failed-precondition','Agent browser calling is not provisioned.'); }
+  }
   const callSid = typeof params.callId === 'string' ? params.callId : '';
-  if (!callSid && action !== 'start_call') throw new HttpsError('invalid-argument', 'A callId is required.');
+  if (!callSid && !['start_call','send_sms'].includes(action)) throw new HttpsError('invalid-argument', 'A callId is required.');
+  if (action==='bind_call' || action==='call_status') {
+    const ref=db.doc(`tenants/${tenantId}/callRecords/${callSid}`), snapshot=await ref.get();
+    if(!snapshot.exists) throw new HttpsError('not-found','Call not found.');
+    const call=snapshot.data(); requireAssignmentBrand(assignment,recordBrandId(call));
+    if(call.tenantId!==tenantId || call.agentUid!==caller.uid || call.provider!==provider.name) throw new HttpsError('permission-denied','Call ownership or provider mismatch.');
+    if(action==='call_status') return {ok:true,callId:callSid,status:call.status,browserState:call.browserState || null,transferStatus:call.transferStatus || null,recordingStatus:call.recordingStatus || null};
+    if(provider.name!=='telnyx') throw new HttpsError('failed-precondition','Browser call binding is only used by the selected phone service.');
+    if(typeof params.browserCallId!=='string' || !params.browserCallId || typeof params.providerCallId!=='string' || !params.providerCallId) throw new HttpsError('invalid-argument','Provider call identifiers are required.');
+    if(call.providerCallId && call.providerCallId!==params.providerCallId) throw new HttpsError('already-exists','This call is already bound to a different provider call.');
+    await ref.update({providerCallId:params.providerCallId,browserCallId:params.browserCallId,providerSessionId:params.providerSessionId || null,providerLegId:params.providerLegId || null,browserState:params.state || null,status:params.state==='active'?'in_progress':call.status,updatedAt:FieldValue.serverTimestamp()});
+    if(call.recordingRequested && !call.recordingStatus) {
+      await ref.update({recordingStatus:'starting',updatedAt:FieldValue.serverTimestamp()});
+      try { await provider.record(params.providerCallId,true); await ref.update({recordingStatus:'recording',updatedAt:FieldValue.serverTimestamp()}); }
+      catch(error) { await ref.update({recordingStatus:'failed',updatedAt:FieldValue.serverTimestamp()}); throw new HttpsError('internal','The call connected, but recording could not start.'); }
+    }
+    return {ok:true,callId:callSid,status:params.state || call.status};
+  }
+  if (['start_consultation','complete_transfer','cancel_transfer','mute_call', 'send_sms', 'start_recording'].includes(action)) {
+    const ref = db.doc(`tenants/${tenantId}/callRecords/${callSid}`);
+    const snapshot = await ref.get();
+    if (!snapshot.exists) throw new HttpsError('not-found','Call not found.');
+    const call = snapshot.data();
+    requireAssignmentBrand(assignment,recordBrandId(call));
+    if (call.tenantId!==tenantId || call.agentUid!==caller.uid || call.provider!==provider.name) throw new HttpsError('permission-denied','Call ownership or provider mismatch.');
+    if (!call.conferenceId || !call.agentCallId) throw new HttpsError('failed-precondition','A connected conference is required for handoff controls.');
+    if (action==='mute_call') { await provider.mute(call.conferenceId,call.agentCallId,params.muted===true); return {ok:true,callId:callSid,muted:params.muted===true}; }
+    if (action==='start_consultation') {
+      if (call.consultationCallId) throw new HttpsError('already-exists','A consultation is already active.');
+      const lead = await db.doc(`tenants/${tenantId}/leads/${call.leadId}`).get();
+      const contactId = call.clientContactId || lead.data()?.routedClientContactId;
+      if (!contactId || contactId.includes('/')) throw new HttpsError('failed-precondition','A routed customer contact is required.');
+      const contactSnapshot = await db.doc(`tenants/${tenantId}/businessOwners/${contactId}`).get();
+      const contact = contactSnapshot.data();
+      if (!contact || contact.status==='inactive' || contact.routingEligible===false || !contact.phone || (recordBrandId(contact) && recordBrandId(contact)!==recordBrandId(call))) throw new HttpsError('failed-precondition','The routed customer is unavailable.');
+      await provider.hold(call.conferenceId,callSid,true);
+      try {
+        const consultation = await provider.start({to:contact.phone,from:call.from,voiceUrl:process.env.TELEPHONY_CONSULTATION_URL,callbackUrl:process.env.TELEPHONY_STATUS_URL,commandId:crypto.randomUUID()});
+        await ref.update({consultationCallId:consultation.id,transferStatus:'consulting',updatedAt:FieldValue.serverTimestamp()});
+      } catch (error) { await provider.hold(call.conferenceId,callSid,false); throw error; }
+      return {ok:true,callId:callSid,status:'consulting'};
+    }
+    if (!call.consultationCallId) throw new HttpsError('failed-precondition','No active consultation.');
+    if (action==='cancel_transfer') {
+      await provider.end(call.consultationCallId); await provider.hold(call.conferenceId,callSid,false);
+      await ref.update({consultationCallId:null,transferStatus:'cancelled',updatedAt:FieldValue.serverTimestamp()});
+      return {ok:true,callId:callSid,status:'in_progress'};
+    }
+    if (call.consultationStatus!=='answered') throw new HttpsError('failed-precondition','The customer must answer before handoff.');
+    await provider.join(call.conferenceId,call.consultationCallId);
+    await provider.hold(call.conferenceId,callSid,false);
+    await provider.remove(call.conferenceId,call.agentCallId);
+    await ref.update({transferStatus:'completion_requested',updatedAt:FieldValue.serverTimestamp()});
+    await recordAudit({tenantId,actorUid:caller.uid,action:'telephony.complete_transfer_requested',target:callSid});
+    return {ok:true,callId:callSid,status:'transfer_pending'};
+  }
   let result;
   let callId = callSid;
   let leadId = typeof params.leadId === 'string' ? params.leadId : '';
@@ -774,21 +875,44 @@ exports.communications = onCall({ enforceAppCheck: true, secrets: [twilioAccount
     const leadData = leadSnapshot.data();
     brandId = recordBrandId(leadData);
     requireAssignmentBrand(assignment, brandId);
+    if (leadData.queueOwnerUid !== caller.uid || (leadData.queueLeaseExpiresAt?.toMillis?.() || 0) < Date.now()) throw new HttpsError('failed-precondition','Accept this lead before calling.');
     if (!params.to || !normalizedPhone(leadData.phone) || normalizedPhone(params.to) !== normalizedPhone(leadData.phone)) {
       throw new HttpsError('permission-denied', 'The call destination must match the authorized lead phone.');
     }
-    if (!process.env.TWILIO_FROM_NUMBER) throw new HttpsError('failed-precondition', 'Telephony is not configured.');
-    result = await twilioRequest('/Calls.json', 'POST', { To: params.to, From: process.env.TWILIO_FROM_NUMBER, Url: params.twimlUrl || process.env.TWILIO_VOICE_WEBHOOK_URL });
-    callId = result.sid;
-    if (!callId) throw new HttpsError('internal', 'The telephony provider did not return a call identifier.');
+    const numbers = await db.collection(`tenants/${tenantId}/phoneNumbers`).where('brandId','==',brandId).get();
+    const number = numbers.docs.map(doc=>doc.data()).find(row=>row.status==='active' && row.provider===provider.name);
+    if (!number?.phoneNumber) throw new HttpsError('failed-precondition','Configure an active client phone number for the selected provider.');
+    if (leadData.disposition==='do_not_call' || leadData.doNotCall===true) throw new HttpsError('failed-precondition','This contact cannot be called.');
+    const brandSnapshot=await db.doc(`tenants/${tenantId}/brands/${brandId}`).get();
+    const recordingPolicy=brandSnapshot.data()?.recordingPolicy || process.env.DEFAULT_RECORDING_POLICY || 'record_on_consent';
+    if(!['do_not_record','record_on_consent','record_all'].includes(recordingPolicy)) throw new HttpsError('failed-precondition','The Brand recording policy is invalid.');
+    if(recordingPolicy==='record_on_consent' && params.recordingConsent!==true) throw new HttpsError('failed-precondition','Confirm the approved recording disclosure before calling.');
+    const leadRef=leadSnapshot.ref;
+    await db.runTransaction(async tx=>{
+      const latest=await tx.get(leadRef); const value=latest.data();
+      if(value.queueOwnerUid!==caller.uid || value.activeCallId || value.callStartPending) throw new HttpsError('already-exists','A call is already active or starting.');
+      tx.update(leadRef,{callStartPending:true,callStartRequestedAt:FieldValue.serverTimestamp()});
+    });
+    // On ambiguous network failure retain pending state: a supervisor must reconcile
+    // provider records before retrying, to avoid duplicate real calls.
+    if(provider.name==='telnyx') {
+      callId=crypto.randomUUID();
+      result={status:'prepared',dial:{to:leadData.phone,from:number.phoneNumber,clientState:Buffer.from(JSON.stringify({gmsCallId:callId,tenantId})).toString('base64')}};
+    } else {
+      result = await provider.start({to:leadData.phone,from:number.phoneNumber,voiceUrl:process.env.TELEPHONY_VOICE_URL,callbackUrl:process.env.TELEPHONY_STATUS_URL,commandId:crypto.randomUUID()});
+      callId = result.id;
+      if (!callId) throw new HttpsError('internal', 'The telephony provider did not return a call identifier.');
+    }
     callRef = db.doc(`tenants/${tenantId}/callRecords/${callId}`);
     await callRef.set({
-      tenantId, brandId, leadId, agentUid: caller.uid, provider: 'twilio', providerCallId: callId,
+      tenantId, brandId, leadId, agentUid: caller.uid, provider: provider.name, providerCallId: provider.name==='telnyx'?null:callId,
       clientContactId: leadData.routedClientContactId || null,
-      direction: 'outbound', destination: String(params.to).slice(0, 80), status: result.status || 'queued',
+      from:number.phoneNumber, direction: 'outbound', destination: String(params.to).slice(0, 80), status: result.status || 'queued',
+      recordingPolicy, recordingConsent:params.recordingConsent===true, recordingRequested:recordingPolicy!=='do_not_record', recordingStatus:null,
       startedAt: FieldValue.serverTimestamp(), endedAt: null, createdBy: caller.uid,
       createdAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp(),
     });
+    await leadRef.update({activeCallId:callId,callStartPending:false});
   } else if (action === 'end_call') {
     callRef = db.doc(`tenants/${tenantId}/callRecords/${callSid}`);
     const callSnapshot = await callRef.get();
@@ -796,7 +920,9 @@ exports.communications = onCall({ enforceAppCheck: true, secrets: [twilioAccount
     brandId = recordBrandId(callSnapshot.data());
     leadId = callSnapshot.data().leadId || '';
     requireAssignmentBrand(assignment, brandId);
-    result = await twilioRequest(`/Calls/${encodeURIComponent(callSid)}.json`, 'POST', { Status: 'completed' });
+    if (callSnapshot.data().provider !== provider.name || callSnapshot.data().agentUid !== caller.uid) throw new HttpsError('permission-denied','Call ownership or provider mismatch.');
+    if(!callSnapshot.data().providerCallId) throw new HttpsError('failed-precondition','The browser call has not connected to the phone service.');
+    result = await provider.end(callSnapshot.data().providerCallId);
   } else if (action === 'hold_call' || action === 'resume_call') {
     callRef = db.doc(`tenants/${tenantId}/callRecords/${callSid}`);
     const callSnapshot = await callRef.get();
@@ -804,7 +930,10 @@ exports.communications = onCall({ enforceAppCheck: true, secrets: [twilioAccount
     brandId = recordBrandId(callSnapshot.data());
     leadId = callSnapshot.data().leadId || '';
     requireAssignmentBrand(assignment, brandId);
-    result = await twilioRequest(`/Calls/${encodeURIComponent(callSid)}.json`, 'POST', { Twiml: action === 'hold_call' ? '<Response><Say>The call is on hold.</Say><Pause length="60"/></Response>' : '<Response><Say>Resuming call.</Say></Response>' });
+    const existing = callSnapshot.data();
+    if (existing.provider !== provider.name || existing.agentUid !== caller.uid) throw new HttpsError('permission-denied','Call ownership or provider mismatch.');
+    if (!existing.providerCallId) throw new HttpsError('failed-precondition','The browser call has not connected to the phone service.');
+    result = existing.conferenceId ? await provider.hold(existing.conferenceId,existing.providerCallId,action==='hold_call') : await provider.holdCall(existing.providerCallId,action==='hold_call');
   } else {
     callRef = db.doc(`tenants/${tenantId}/callRecords/${callSid}`);
     const callSnapshot = await callRef.get();
@@ -828,28 +957,61 @@ exports.communications = onCall({ enforceAppCheck: true, secrets: [twilioAccount
     if (!normalizedPhone(contact.phone) || normalizedPhone(params.transferTo) !== normalizedPhone(contact.phone)) {
       throw new HttpsError('permission-denied', 'Transfers must use the routed Client Contact phone.');
     }
-    result = await twilioRequest(`/Calls/${encodeURIComponent(callSid)}.json`, 'POST', { Twiml: `<Response><Dial>${String(params.transferTo).replace(/[<>]/g, '')}</Dial></Response>` });
+    // A blind redirect is not a warm transfer. Require a consultation leg first.
+    throw new HttpsError('failed-precondition','Start and confirm a consultation call before completing a warm transfer.');
   }
   if (callRef && action !== 'start_call') {
     const status = action === 'end_call' ? 'completed' : action === 'hold_call' ? 'on_hold' : action === 'resume_call' ? 'in_progress' : 'transferred';
     await callRef.update({
-      status, updatedAt: FieldValue.serverTimestamp(), updatedBy: caller.uid,
-      ...(action === 'end_call' ? { endedAt: FieldValue.serverTimestamp() } : {}),
+      ...(action === 'end_call' ? {endRequestedAt:FieldValue.serverTimestamp()} : {status}), updatedAt: FieldValue.serverTimestamp(), updatedBy: caller.uid,
     });
   }
   await recordAudit({ tenantId, actorUid: caller.uid, action: `telephony.${action}`, target: callId || null, metadata: { brandId, leadId } });
-  return { ok: true, action, callId, status: result.status || 'accepted' };
+  return { ok: true, action, callId, status: action==='end_call'?'ending':action==='hold_call'?'on_hold':action==='resume_call'?'in_progress':result.status || 'accepted', ...(result.dial?{dial:result.dial}:{}) };
 });
 
-exports.twilioWebhook = onRequest({ cors: false, secrets: [twilioAuthToken] }, async (request, response) => {
-  if (request.method !== 'POST') return response.status(405).send('Method not allowed');
-  const authToken = twilioAuthToken.value();
-  if (!authToken || authToken === 'not-configured') return response.status(503).send('Telephony is not configured');
-  const signature = request.get('X-Twilio-Signature') || '';
-  const url = `${request.protocol}://${request.get('host')}${request.originalUrl}`;
-  const params = request.body || {};
-  const data = url + Object.keys(params).sort().map((key) => `${key}${params[key]}`).join('');
-  const expected = crypto.createHmac('sha1', authToken).update(data).digest('base64');
-  if (signature.length !== expected.length || !crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expected))) return response.status(403).send('Invalid signature');
-  response.type('text/xml').send('<Response><Say>Link Marketing Services call connected.</Say></Response>');
-});
+const { verifySignature } = require('./telephony/providers.cjs');
+const { normalizeEvent, statusCanAdvance } = require('./telephony/events.cjs');
+function phoneWebhook(providerName, secrets) {
+  return onRequest({cors:false,secrets},async(request,response)=>{
+    if(request.method!=='POST') return response.status(405).send('Method not allowed');
+    const config = providerName==='twilio'?{token:twilioAuthToken.value()}:providerName==='signalwire'?{token:signalwireToken.value()}:{publicKey:process.env.TELNYX_PUBLIC_KEY};
+    const canonicalUrl=process.env[`${providerName.toUpperCase()}_STATUS_WEBHOOK_URL`];
+    const rawBody=request.rawBody || Buffer.from(JSON.stringify(request.body || {}));
+    const valid=verifySignature(providerName,{url:canonicalUrl,body:request.body || {},rawBody,signature:request.get(providerName==='telnyx'?'telnyx-signature-ed25519':providerName==='signalwire'?'x-signalwire-signature':'x-twilio-signature') || '',timestamp:request.get('telnyx-timestamp')},config);
+    if(!valid) return response.status(403).send('Invalid signature');
+    const event=normalizeEvent(providerName,request.body || {},rawBody);
+    if(!event.callId) return response.status(400).send('Missing call identifier');
+    const snapshots=await db.collectionGroup('callRecords').where('provider','==',providerName).where('providerCallId','==',event.callId).limit(2).get();
+    let matches=snapshots.docs, consultation=false;
+    if(!matches.length && providerName==='telnyx' && event.gmsCallId && event.tenantId && !event.gmsCallId.includes('/') && !event.tenantId.includes('/')) {
+      const candidate=await db.doc(`tenants/${event.tenantId}/callRecords/${event.gmsCallId}`).get();
+      if(candidate.exists && candidate.data().provider==='telnyx') matches=[candidate];
+    }
+    if(!matches.length) { const other=await db.collectionGroup('callRecords').where('provider','==',providerName).where('consultationCallId','==',event.callId).limit(2).get(); matches=other.docs; consultation=true; }
+    if(matches.length!==1) return response.status(202).send('No uniquely mapped call');
+    const ref=matches[0].ref;
+    await db.runTransaction(async tx=>{
+      const eventRef=ref.collection('providerEvents').doc(event.id);
+      const [seen,current]=await Promise.all([tx.get(eventRef),tx.get(ref)]);
+      if(seen.exists) return;
+      const patch={updatedAt:FieldValue.serverTimestamp()};
+      if(!consultation && !current.data().providerCallId && event.callId) patch.providerCallId=event.callId;
+      if(consultation) { if(event.answered) patch.consultationStatus='answered'; else if(event.status==='completed') patch.consultationStatus='completed'; }
+      else if(statusCanAdvance(current.data().status,event.status)) patch.status=event.status;
+      if(event.recordingUrl) patch.recordingUrl=event.recordingUrl;
+      if(!consultation && event.status==='completed') patch.endedAt=FieldValue.serverTimestamp();
+      if(!consultation && ['completed','failed','busy','no-answer','canceled'].includes(event.status) && current.data().leadId) {
+        const leadRef=db.doc(`tenants/${current.data().tenantId}/leads/${current.data().leadId}`);
+        const lead=await tx.get(leadRef);
+        if(lead.exists && lead.data().activeCallId===ref.id) tx.update(leadRef,{activeCallId:null,callStartPending:false});
+      }
+      tx.create(eventRef,{provider:providerName,eventType:event.eventType || 'unknown',receivedAt:FieldValue.serverTimestamp()});
+      tx.update(ref,patch);
+    });
+    return response.status(200).send('Accepted');
+  });
+}
+exports.twilioWebhook=phoneWebhook('twilio',[twilioAuthToken]);
+exports.telnyxWebhook=phoneWebhook('telnyx',[]);
+exports.signalwireWebhook=phoneWebhook('signalwire',[signalwireToken]);
