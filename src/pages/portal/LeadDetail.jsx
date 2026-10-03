@@ -87,6 +87,14 @@ export default function LeadDetail() {
             </ol>
           </SectionCard>
 
+          <SectionCard title="Call activity" subtitle="Calls placed through this campaign's assigned number">
+            {lead.calls?.length ? <div className="space-y-2">{lead.calls.map((call) => <div key={call.id} className="rounded-lg border p-3 text-[12.5px]" style={{ borderColor: "var(--line-2)", background: "var(--offwhite)" }}>
+              <div className="flex items-center justify-between gap-3"><span className="font-semibold capitalize" style={{ color: "var(--shell)" }}>{String(call.status || "pending").replace(/_/g, " ")}</span><span style={{ color: "var(--muted-ink)" }}>{fmtDateTime(call.startedAt)}</span></div>
+              <div className="mt-1" style={{ color: "var(--ink-2)" }}>Campaign number {call.from || "Pending assignment"} · Recording {String(call.recordingStatus || "not requested").replace(/_/g, " ")}</div>
+              {call.recordingUrl && <a href={call.recordingUrl} target="_blank" rel="noreferrer" className="mt-2 inline-flex font-semibold hover:underline" style={{ color: "var(--teal)" }}>Open recording</a>}
+            </div>)}</div> : <p className="text-[13px]" style={{ color: "var(--muted-ink)" }}>No calls have been recorded for this lead.</p>}
+          </SectionCard>
+
           <SectionCard title="GMS Qualification Receipt" subtitle="Evidence-backed checkpoints for this opportunity">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <ReceiptRow icon={ShieldCheck} label="Lifecycle stage" value={lifecycleLabel(lifecycle)} />
