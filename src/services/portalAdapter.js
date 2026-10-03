@@ -351,7 +351,11 @@ function getLeads(params = {}) {
 
 const getLead = async (id) => {
   if (isDataFixtureMode()) return delay().then(() => sampleLeads.find((l) => l.id === id) || null);
-  if (isFirebaseMode) { const row = (await getTenantRows("leads")).find((item) => item.id === id); return row ? normalizeLeadRow(row) : null; }
+  if (isFirebaseMode) {
+    const [leads, calls] = await Promise.all([getTenantRows("leads"), getTenantRows("callRecords")]);
+    const row = leads.find((item) => item.id === id);
+    return row ? {...normalizeLeadRow(row), calls:(calls || []).filter((call)=>call.leadId===id).map((call)=>({id:call.id,status:call.status,startedAt:asIso(call.startedAt || call.createdAt),endedAt:asIso(call.endedAt),from:call.from,recordingStatus:call.recordingStatus || null,recordingUrl:call.recordingUrl || null,transferStatus:call.transferStatus || null}))} : null;
+  }
   return request("GET", `/leads/${id}`);
 };
 const getAppointments = async () => {
