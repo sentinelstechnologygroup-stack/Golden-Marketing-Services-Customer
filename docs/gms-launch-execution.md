@@ -41,11 +41,7 @@ agency subscription to satisfy a release gate.
 - [ ] Reconcile active GMS domain registration, Firebase Auth templates and provider
       callback URLs. Historical domain transfers are not a prerequisite.
 
-Canonical backend: `linkmarketing-agent-portal-crm`. The immutable project ID,
-Firebase app IDs, bucket identity, `lmsSuperAdmin` claim, ingestion secret name,
-role aliases and existing tenant keys are compatibility dependencies. Changing
-these strings is a migration, not removal of public branding. Do not split data
-into three projects. Prefer GMS display names while keeping live identities.
+Canonical GMS backend: gms-prod-1089114348316. The 2026-10-03 ownership migration supersedes the former compatibility requirement. GMS has independent app IDs, Storage, Functions, secrets, gmsSuperAdmin claims and GMS-only tenant assignments. The three GMS applications use this GMS backend; LMS uses its own infrastructure. See gms-ownership-isolation.md for the migration and backup evidence.
 
 ## 2. Complete GoHighLevel integration
 

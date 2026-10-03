@@ -1,16 +1,12 @@
 # GMS shared Firebase architecture
 
-The canonical backend is `linkmarketing-agent-portal-crm`, with one Firebase Auth
-user directory, Firestore database, Storage bucket and Functions deployment.
-The project ID and bucket name are retained compatibility identities.
-Desired display name: **GMS Platform Production**; cloud configuration still needs
-an authenticated verification pass.
+The GMS backend is gms-prod-1089114348316, display name GMS Production, project number 852174491354. It has independent Authentication, Firestore, Storage, Functions, service accounts and secrets. LMS is a separate product and no LMS runtime resources are shared.
 
-| Application | Firebase web app ID | Current production host |
+| Application | Firebase web app ID | Production host |
 | --- | --- | --- |
-| GMS Website | `1:1089114348316:web:8af2519a66cdddafc778d9` | `www.goldenmarketingservices.com` |
-| GMS Customer Portal | `1:1089114348316:web:6d1cf9944ca6ef1cc778d9` | `customer.goldenmarketingservices.com` |
-| GMS Agent CRM | `1:1089114348316:web:8df2b05d88d1df8cc778d9` | `agentcrm.goldenmarketingservices.com` |
+| GMS Website | 1:852174491354:web:622943755a30ad887b5fe3 | www.goldenmarketingservices.com |
+| GMS Customer Portal | 1:852174491354:web:2a343214aa5cc41c7b5fe3 | customer.goldenmarketingservices.com |
+| GMS Agent CRM | 1:852174491354:web:4d7468295ba977987b5fe3 | gentcrm.goldenmarketingservices.com |
 
 These hosts are required registration targets, not a claim that Auth/App Check
 registration has been verified in the cloud. Both portals can initialize
