@@ -21,9 +21,9 @@ function escapeHtml(value) {
 }
 
 function buildNotificationEmail({ title, body, portalUrl }) {
-  const cleanTitle = String(title || 'Link Marketing Services notification').trim().slice(0, 180);
+  const cleanTitle = String(title || 'Golden Marketing Services notification').trim().slice(0, 180);
   const cleanBody = String(body || '').trim().slice(0, 5000);
-  const destination = `${String(portalUrl || 'https://customer.linkmarketingservices.co').replace(/\/$/, '')}/notifications`;
+  const destination = `${String(portalUrl || 'https://customer.goldenmarketingservices.com').replace(/\/$/, '')}/notifications`;
   return {
     subject: cleanTitle,
     text: `${cleanBody}\n\nOpen your protected customer portal: ${destination}`,

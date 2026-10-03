@@ -1,5 +1,5 @@
 // Read-only production probe. Credentials are injected in memory, never printed.
-if (process.env.GCLOUD_PROJECT !== 'linkmarketing-agent-portal-crm' || process.env.FIRESTORE_EMULATOR_HOST) throw new Error('Explicit production project required.');
+if (process.env.GCLOUD_PROJECT !== 'gms-prod-1089114348316' || process.env.FIRESTORE_EMULATOR_HOST) throw new Error('Explicit production project required.');
 if (!process.env.GMS_GOHIGHLEVEL_CONFIG) throw new Error('Backend credentials required.');
 const functions = require('../index');
 const { getAuth } = require('firebase-admin/auth');

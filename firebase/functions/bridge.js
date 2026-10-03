@@ -10,7 +10,7 @@ const { canonicalLead } = require('./bridge-contract.cjs');
 if (!getApps().length) initializeApp();
 const db = getFirestore();
 const auth = getAuth();
-const ingestionKey = defineSecret('LMS_INGESTION_KEY');
+const ingestionKey = defineSecret('GMS_INGESTION_KEY');
 const CLIENT_ROLES = new Set(['client', 'client_admin', 'client_supervisor']);
 const ASSET_COLLECTIONS = {
   document: 'documents', report: 'reports', export: 'reports', invoice: 'invoices', recording: 'callRecords', upload: 'documents',
@@ -34,8 +34,8 @@ function requireCaller(request) {
 async function requireSuperAdmin(request) {
   const caller = requireCaller(request);
   const user = await auth.getUser(caller.uid);
-  if (caller.token?.lmsSuperAdmin !== true && user.customClaims?.lmsSuperAdmin !== true && user.customClaims?.platformAdmin !== true) {
-    throw new HttpsError('permission-denied', 'LMS Super Admin access is required.');
+  if (caller.token?.gmsSuperAdmin !== true && user.customClaims?.gmsSuperAdmin !== true && user.customClaims?.platformAdmin !== true) {
+    throw new HttpsError('permission-denied', 'GMS Super Admin access is required.');
   }
   return caller;
 }
@@ -119,7 +119,7 @@ exports.ingestWebsiteLead = onRequest({ cors: false, secrets: [ingestionKey], ti
   const supplied = String(request.get('authorization') || '').replace(/^Bearer\s+/i, '');
   const valid = expected && supplied && supplied.length === expected.length && crypto.timingSafeEqual(Buffer.from(supplied), Buffer.from(expected));
   if (!valid) return response.status(401).json({ error: 'Unauthorized' });
-  const routeKey = clean(request.get('x-lms-route-key'), 120).toLowerCase();
+  const routeKey = clean(request.get('x-gms-route-key'), 120).toLowerCase();
   if (!routeKey) return response.status(400).json({ error: 'A server route key is required' });
   const routeSnapshot = await db.doc(`ingestionRoutes/${routeKey}`).get();
   if (!routeSnapshot.exists || routeSnapshot.data().status !== 'active') return response.status(404).json({ error: 'Route not found' });
@@ -171,7 +171,7 @@ exports.registerTenantAsset = onCall({ enforceAppCheck: true }, async (request) 
   const assetType = clean(input.assetType, 50).toLowerCase();
   const storagePath = clean(input.storagePath, 1000);
   const user = await auth.getUser(caller.uid);
-  const superAdmin = caller.token?.lmsSuperAdmin === true || user.customClaims?.lmsSuperAdmin === true || user.customClaims?.platformAdmin === true;
+  const superAdmin = caller.token?.gmsSuperAdmin === true || user.customClaims?.gmsSuperAdmin === true || user.customClaims?.platformAdmin === true;
   if (!tenantId || !brandId || !ASSET_COLLECTIONS[assetType]) throw new HttpsError('invalid-argument', 'tenantId, brandId, and a supported assetType are required.');
   if (!storagePath.startsWith(`tenants/${tenantId}/brands/${brandId}/`)) throw new HttpsError('permission-denied', 'The asset path must match its immutable tenant and Brand ownership.');
   if (!(await canOperateTenant(caller.uid, tenantId, brandId, superAdmin))) throw new HttpsError('permission-denied', 'You are not authorized for this tenant and Brand.');

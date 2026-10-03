@@ -16,8 +16,8 @@ test('fresh roles, tenant isolation, canonical ownership and provider response f
     ids[role] = `${prefix}-${role}`;
     await auth.createUser({ uid: ids[role], disabled: role === 'disabled' });
   }
-  await auth.setCustomUserClaims(ids.admin, { lmsSuperAdmin: true });
-  await auth.setCustomUserClaims(ids.password, { lmsSuperAdmin: true, mustChangePassword: true });
+  await auth.setCustomUserClaims(ids.admin, { gmsSuperAdmin: true });
+  await auth.setCustomUserClaims(ids.password, { gmsSuperAdmin: true, mustChangePassword: true });
   const data = { locationId: 'location-test', phoneNumber: '', telnyxPhoneNumberId: '' };
   await db.doc(`tenants/${tenantId}`).set({ environment: 'production', demo: false });
   await db.doc(`tenants/${tenantId}/config/onboarding`).set({ data, revision: 1 });
@@ -39,7 +39,7 @@ test('fresh roles, tenant isolation, canonical ownership and provider response f
     await assert.rejects(functions.readGoHighLevelResource.run({ data: { tenantId } }), { code: 'unauthenticated' });
     for (const role of ['agent', 'scoped', 'outsider', 'disabled', 'password', 'revoked']) {
       for (const resource of ['calendars', 'pipelines', 'workflows', 'forms', 'campaigns']) {
-        await assert.rejects(functions.readGoHighLevelResource.run(call(ids[role], { tenantId, resource }, { lmsSuperAdmin: true })), { code: 'permission-denied' });
+        await assert.rejects(functions.readGoHighLevelResource.run(call(ids[role], { tenantId, resource }, { gmsSuperAdmin: true })), { code: 'permission-denied' });
       }
     }
     assert.equal(requests, 0, 'unauthorized callers must never reach provider');

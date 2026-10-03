@@ -29,7 +29,7 @@ async function authorize(request, tenantId, adminOnly = false) {
   const user = await getAuth().getUser(request.auth.uid);
   if (user.disabled || user.customClaims?.mustChangePassword) throw new HttpsError('permission-denied', 'Account access is unavailable.');
   const claims = user.customClaims || {};
-  if (claims.platformAdmin === true || claims.lmsSuperAdmin === true) return { fullTenant: true };
+  if (claims.platformAdmin === true || claims.gmsSuperAdmin === true) return { fullTenant: true };
   if (adminOnly) throw new HttpsError('permission-denied', 'GMS Super Admin is required.');
   // Until record-level brand filtering is integrated, location-wide reads are
   // limited to full-tenant administrators. A scoped agent must not see all brands.

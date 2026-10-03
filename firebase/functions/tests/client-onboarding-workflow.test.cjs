@@ -12,7 +12,7 @@ const adminUid = `${prefix}-admin`; const clientUid = `${prefix}-customer`;
 const call = (uid, data) => ({ auth:{uid,token:{}},data });
 test('draft -> projections -> client approval -> gated routing; isolated tenants and stale saves denied', async () => {
   await auth.createUser({uid:adminUid,email:`${prefix}-admin@example.test`});
-  await auth.setCustomUserClaims(adminUid,{lmsSuperAdmin:true});
+  await auth.setCustomUserClaims(adminUid,{gmsSuperAdmin:true});
   await auth.createUser({uid:clientUid,email:`${prefix}-customer@example.test`});
   const data = {name:'Emulator client',brandName:'Emulator brand',industry:'services',adminEmail:`${prefix}-customer@example.test`,locationId:`location-${prefix}`,phoneNumber:'+13125551234',telnyxPhoneNumberId:'123456789012345678',campaigns:[]};
   const initial = await functions.saveGmsClient.run(call(adminUid,{clientId:tenantId,create:true,revision:0,data}));

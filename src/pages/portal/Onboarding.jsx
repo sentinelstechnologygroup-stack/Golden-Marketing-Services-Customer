@@ -10,7 +10,7 @@ export default function Onboarding() {
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
   const [notes, setNotes] = useState({});
-  const platformAdmin = session?.lmsSuperAdmin === true;
+  const platformAdmin = session?.gmsSuperAdmin === true;
   const clientAdmin = ['client_admin', 'client_supervisor'].includes(session?.user?.role);
   const refresh = () => portalAdapter.onboarding.get().then(setRecord);
   useEffect(() => { refresh().catch(e => setMessage(e.message)); }, []);

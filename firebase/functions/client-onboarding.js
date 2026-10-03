@@ -12,7 +12,7 @@ async function identity(request, adminOnly = true) {
   if (!request.auth?.uid) throw new HttpsError('unauthenticated', 'Sign in first.');
   const user = await getAuth().getUser(request.auth.uid);
   if (user.disabled || user.customClaims?.mustChangePassword) throw new HttpsError('permission-denied', 'Account access is unavailable.');
-  const admin = user.customClaims?.lmsSuperAdmin === true || user.customClaims?.platformAdmin === true;
+  const admin = user.customClaims?.gmsSuperAdmin === true || user.customClaims?.platformAdmin === true;
   if (adminOnly && !admin) throw new HttpsError('permission-denied', 'GMS Super Admin access required.');
   return { user, admin };
 }
@@ -99,7 +99,7 @@ exports.saveGmsClient = onCall(options, async request => {
   if (data.adminEmail) {
     try { clientUser = await getAuth().getUserByEmail(data.adminEmail); }
     catch (error) { if (error.code !== 'auth/user-not-found') throw error; }
-    if (clientUser && (clientUser.disabled || clientUser.customClaims?.lmsSuperAdmin || clientUser.customClaims?.platformAdmin)) {
+    if (clientUser && (clientUser.disabled || clientUser.customClaims?.gmsSuperAdmin || clientUser.customClaims?.platformAdmin)) {
       throw new HttpsError('failed-precondition', 'Use a separate customer administrator email, not a GMS staff administrator.');
     }
   }
@@ -238,7 +238,7 @@ exports.prepareGmsClientLogin = onCall(options, async request => {
     try { user = await getAuth().createUser({ email, password: require('node:crypto').randomBytes(32).toString('base64url') }); }
     catch (e) { if (e.code !== 'auth/email-already-exists') throw e; user = await getAuth().getUserByEmail(email); }
   }
-  if (user.disabled || user.customClaims?.lmsSuperAdmin || user.customClaims?.platformAdmin) throw new HttpsError('failed-precondition', 'This email cannot be used as a customer administrator.');
+  if (user.disabled || user.customClaims?.gmsSuperAdmin || user.customClaims?.platformAdmin) throw new HttpsError('failed-precondition', 'This email cannot be used as a customer administrator.');
   await db.runTransaction(async tx => {
     const current = await tx.get(configRef);
     const memberRef = root.collection('members').doc(user.uid);

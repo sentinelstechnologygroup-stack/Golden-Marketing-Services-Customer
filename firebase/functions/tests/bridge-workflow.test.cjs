@@ -1,7 +1,7 @@
 const assert = require('node:assert/strict');
 const test = require('node:test');
 
-process.env.LMS_INGESTION_KEY = 'emulator-ingestion-key';
+process.env.GMS_INGESTION_KEY = 'emulator-ingestion-key';
 
 const { getAuth } = require('firebase-admin/auth');
 const { getFirestore } = require('firebase-admin/firestore');
@@ -26,8 +26,8 @@ async function invokeHttp(handler, { method = 'POST', headers = {}, body = {} } 
     body,
     rawBody: Buffer.from(JSON.stringify(body)),
     protocol: 'http',
-    originalUrl: '/demo-linkmarketing-local/us-central1/ingestWebsiteLead',
-    url: '/demo-linkmarketing-local/us-central1/ingestWebsiteLead',
+    originalUrl: '/demo-gms-local/us-central1/ingestWebsiteLead',
+    url: '/demo-gms-local/us-central1/ingestWebsiteLead',
     get(name) { return normalizedHeaders[String(name).toLowerCase()] || ''; },
   };
   const response = {
@@ -56,7 +56,7 @@ test.before(async () => {
     auth.createUser({ uid: agentUid, email: 'workflow-agent@example.test', displayName: 'Workflow Agent' }),
     auth.createUser({ uid: clientUid, email: 'workflow-client@example.test', displayName: 'Workflow Client Admin' }),
   ]);
-  await auth.setCustomUserClaims(lmsAdminUid, { lmsSuperAdmin: true, platformAdmin: true });
+  await auth.setCustomUserClaims(lmsAdminUid, { gmsSuperAdmin: true, platformAdmin: true });
 });
 
 test.after(async () => {
@@ -87,7 +87,7 @@ test('existing-route ingestion, Agent workflow, Customer projection, and Brand i
   const ingestion = await invokeHttp(functions.ingestWebsiteLead, {
     headers: {
       authorization: 'Bearer emulator-ingestion-key',
-      'x-lms-route-key': 'workflow-bridge-route',
+      'x-gms-route-key': 'workflow-bridge-route',
     },
     body: {
       name: 'Workflow Pilot Lead',

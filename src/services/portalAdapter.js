@@ -54,12 +54,12 @@ const PREVIEW_DATA_ENABLED = false;
 const UI_FIXTURES_ENABLED = false;
 const BYPASS_ENABLED = false;
 const BYPASS_TOKEN = "";
-const BYPASS_KEY = "link-marketing-portal-bypass";
+const BYPASS_KEY = "gms-portal-bypass";
 export const isPreviewMode = PREVIEW_DATA_ENABLED;
 export const isFixtureDataMode = PREVIEW_DATA_ENABLED || UI_FIXTURES_ENABLED;
 export const isFirebaseMode = firebaseConfigured && !API_URL;
 const DEMO_TENANT_IDS = new Set([
-  "tenant-lms-realtor-demo",
+  "tenant-gms-realtor-demo",
 ]);
 let activeTenantId = null;
 

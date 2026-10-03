@@ -2,7 +2,7 @@
 
 ## Permanent environment boundaries
 
-- `tenant-lms-realtor-demo` is the permanent neutral Realtor demo. It may use fixtures and must not be changed by production migrations.
+- `tenant-gms-realtor-demo` is the permanent neutral Realtor demo. It may use fixtures and must not be changed by production migrations.
 - Golden Cross Realty is a live beta tenant. It must use tenant-scoped Firebase records and must never inherit demo fixtures.
 - All other customer tenants use live Firebase data. Empty tenants retain every page, card, form, filter, table header, and workflow control while displaying zero or empty rows.
 - Agent CRM records and customer records share the canonical `/tenants/{tenantId}` contract. Customer users never receive Agent CRM-wide permissions.
@@ -12,7 +12,7 @@
 - `client`: reads tenant-facing records and performs permitted customer workflows.
 - `client_supervisor`: client access plus team visibility and operational oversight.
 - `client_admin`: client supervisor access plus profile, invitation, membership, and tenant settings management.
-- `lms_super_admin`: privileged LMS support access granted only by a Firebase Auth custom claim.
+- `gms_super_admin`: privileged GMS support access granted only by a Firebase Auth custom claim.
 
 Legacy `customer`, `supervisor`, `admin`, and `super_admin` membership values are normalized by the Functions layer during migration. A browser-supplied role or tenant identifier never grants access.
 
@@ -20,7 +20,7 @@ Legacy `customer`, `supervisor`, `admin`, and `super_admin` membership values ar
 
 - Firebase Authentication owns sign-in, password recovery, sessions, and logout.
 - Every customer read or write derives authorization from the authenticated UID and `/tenants/{tenantId}/members/{uid}`.
-- LMS super-admin access requires the `lmsSuperAdmin: true` custom claim; a string role in browser data is insufficient.
+- GMS super-admin access requires the `gmsSuperAdmin: true` custom claim; a string role in browser data is insufficient.
 - Agent access is derived from `/agentUsers/{uid}/assignments/{tenantId}` and is separate from customer membership.
 - Firestore and Storage rules deny cross-tenant access even if a caller guesses another tenant ID or document path.
 

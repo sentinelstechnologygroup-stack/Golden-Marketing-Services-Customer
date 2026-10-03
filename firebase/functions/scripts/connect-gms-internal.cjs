@@ -1,6 +1,6 @@
 // Operator maintenance: uses existing Google application-default credentials.
 // Never creates a login, changes customer ownership or prints provider secrets.
-if (process.env.GCLOUD_PROJECT !== 'linkmarketing-agent-portal-crm' || process.env.FIRESTORE_EMULATOR_HOST) throw new Error('Explicit production project required.');
+if (process.env.GCLOUD_PROJECT !== 'gms-prod-1089114348316' || process.env.FIRESTORE_EMULATOR_HOST) throw new Error('Explicit production project required.');
 if (!process.env.GMS_GOHIGHLEVEL_CONFIG) throw new Error('Inject Secret Manager configuration in memory first.');
 const functions = require('../index');
 const { getAuth } = require('firebase-admin/auth');
@@ -8,7 +8,7 @@ const { getFirestore } = require('firebase-admin/firestore');
 async function main() {
   const tenantId = 'gms-internal'; const locationId = '5BAXXiLlxJSiM5tspPQy';
   const admin = await getAuth().getUserByEmail('admin@goldenmarketingservices.com');
-  if (admin.disabled || admin.customClaims?.mustChangePassword || admin.customClaims?.lmsSuperAdmin !== true) throw new Error('Active GMS Super Admin required.');
+  if (admin.disabled || admin.customClaims?.mustChangePassword || admin.customClaims?.gmsSuperAdmin !== true) throw new Error('Active GMS Super Admin required.');
   const db = getFirestore();
   const existing = await db.doc(`tenants/${tenantId}/config/onboarding`).get();
   const call = data => ({ auth: { uid: admin.uid, token: {} }, data });

@@ -8,8 +8,8 @@ const { buildNotificationEmail, emailDeliveryAllowed, emailProviderConfigured } 
 if (!getApps().length) initializeApp();
 const db = getFirestore();
 const resendApiKey = defineSecret('RESEND_API_KEY');
-const emailFrom = process.env.LMS_EMAIL_FROM || 'Link Marketing Services <notifications@linkmarketingservices.co>';
-const customerPortalUrl = process.env.LMS_CUSTOMER_PORTAL_URL || 'https://customer.linkmarketingservices.co';
+const emailFrom = process.env.GMS_EMAIL_FROM || 'Golden Marketing Services <notifications@goldenmarketingservices.com>';
+const customerPortalUrl = process.env.GMS_CUSTOMER_PORTAL_URL || 'https://customer.goldenmarketingservices.com';
 
 async function updateDelivery(ref, status, detail = {}) {
   await ref.set({
@@ -85,7 +85,7 @@ exports.deliverNotificationEmail = onDocumentCreated({
     headers: {
       Authorization: `Bearer ${apiKey}`,
       'Content-Type': 'application/json',
-      'Idempotency-Key': `lms-${tenantId}-${notificationId}`,
+      'Idempotency-Key': `gms-${tenantId}-${notificationId}`,
     },
     body: JSON.stringify({ from: emailFrom, to: [user.email], ...content }),
   });

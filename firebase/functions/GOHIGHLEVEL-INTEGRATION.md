@@ -6,7 +6,7 @@ Jonathan's logged-in Golden Cross Realty agency is on Unlimited ($297/month).
 With the user's action-time approval, the agency private integration **GMS Agent
 Portal** was created with only `locations.readonly`. Its credential is installed
 as version 1 of `GMS_GOHIGHLEVEL_CONFIG` in project
-`linkmarketing-agent-portal-crm`. A separate read-back from Secret Manager and
+`gms-prod-1089114348316`. A separate read-back from Secret Manager and
 live GET `/locations/5GaI30HFH3H9Lzqg3iiO` returned HTTP 200 and matching location
 and agency IDs. No token values are recorded here.
 

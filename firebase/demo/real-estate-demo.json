@@ -1,7 +1,7 @@
 {
   "vertical": "real-estate",
-  "displayName": "Link Marketing Services Realtor Demo",
-  "tenantId": "tenant-lms-realtor-demo",
+  "displayName": "Golden Marketing Services Realtor Demo",
+  "tenantId": "tenant-gms-realtor-demo",
   "environment": "demo",
   "industry": "Real Estate Brokerage",
   "branding": {

@@ -74,7 +74,7 @@ export const FIREBASE_TARGETS = {
 const normalizeTarget = (target) => {
   switch ((target || "").toLowerCase()) {
     case "website":
-    case "lms-website":
+    case "gms-website":
     case "site":
     case "web":
       return FIREBASE_TARGETS.website

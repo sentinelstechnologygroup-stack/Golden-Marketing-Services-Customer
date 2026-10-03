@@ -16,7 +16,7 @@ const ROLES = [
   { value: "client_admin", label: "Client Admin" },
 ];
 const ROLE_LABELS = Object.fromEntries(ROLES.map((role) => [role.value, role.label]));
-ROLE_LABELS.lms_super_admin = "GMS Super Admin";
+ROLE_LABELS.gms_super_admin = "GMS Super Admin";
 ROLE_LABELS.customer = "Client";
 ROLE_LABELS.supervisor = "Client Supervisor";
 ROLE_LABELS.admin = "Client Admin";
@@ -29,7 +29,7 @@ const canonicalRole = (role) => ({
   customer: "client",
   admin: "client_admin",
   supervisor: "client_supervisor",
-  super_admin: "lms_super_admin",
+  super_admin: "gms_super_admin",
 }[role] || role);
 
 export default function Account() {
@@ -190,11 +190,11 @@ export default function Account() {
                   <tr key={u.id} className="border-b last:border-0" style={{ borderColor: "var(--line-2)" }}>
                     <td className="px-2 py-3"><div className="flex items-center gap-2.5"><span className="w-8 h-8 rounded-full flex items-center justify-center text-[11px] font-semibold text-white shrink-0" style={{ background: "var(--teal-2)" }}>{initials(u.name)}</span><div><div className="font-semibold" style={{ color: "var(--shell)" }}>{u.name}</div><div className="text-[11.5px]" style={{ color: "var(--muted-ink)" }}>{u.email}</div></div></div></td>
                     <td className="px-2 py-3">
-                      {canManageMembers ? <select value={canonicalRole(u.role)} onChange={(e) => changeRole(u.id, e.target.value)} disabled={u.id === currentUser.uid || u.id === currentUser.id || canonicalRole(u.role) === "lms_super_admin"} className="touch-target rounded-lg px-2 text-[12.5px] bg-white border focus-ring disabled:opacity-70" style={{ borderColor: "var(--line)" }}>{ROLES.map((role) => <option key={role.value} value={role.value}>{role.label}</option>)}</select> : <span>{ROLE_LABELS[canonicalRole(u.role)] || u.role}</span>}
+                      {canManageMembers ? <select value={canonicalRole(u.role)} onChange={(e) => changeRole(u.id, e.target.value)} disabled={u.id === currentUser.uid || u.id === currentUser.id || canonicalRole(u.role) === "gms_super_admin"} className="touch-target rounded-lg px-2 text-[12.5px] bg-white border focus-ring disabled:opacity-70" style={{ borderColor: "var(--line)" }}>{ROLES.map((role) => <option key={role.value} value={role.value}>{role.label}</option>)}</select> : <span>{ROLE_LABELS[canonicalRole(u.role)] || u.role}</span>}
                     </td>
                     <td className="px-2 py-3"><Badge tone="success">{u.status}</Badge></td>
                     <td className="px-2 py-3 whitespace-nowrap">{relativeTime(u.lastActive)}</td>
-                    <td className="px-2 py-3 text-right">{canManageMembers && u.id !== currentUser.uid && u.id !== currentUser.id && canonicalRole(u.role) !== "lms_super_admin" && <button onClick={() => deactivateUser(u.id)} aria-label={`Deactivate ${u.name}`} className="touch-target w-9 h-9 rounded-lg inline-flex items-center justify-center focus-ring" style={{ color: "var(--danger)" }}><Ban className="w-4 h-4" /></button>}</td>
+                    <td className="px-2 py-3 text-right">{canManageMembers && u.id !== currentUser.uid && u.id !== currentUser.id && canonicalRole(u.role) !== "gms_super_admin" && <button onClick={() => deactivateUser(u.id)} aria-label={`Deactivate ${u.name}`} className="touch-target w-9 h-9 rounded-lg inline-flex items-center justify-center focus-ring" style={{ color: "var(--danger)" }}><Ban className="w-4 h-4" /></button>}</td>
                   </tr>
                 ))}
               </tbody>

@@ -1,7 +1,7 @@
 const { initializeApp } = require('firebase-admin/app');
 const { getFirestore } = require('firebase-admin/firestore');
 
-initializeApp({ projectId: 'demo-linkmarketing-local' });
+initializeApp({ projectId: 'demo-gms-local' });
 async function deleteCollection(ref, batchSize = 200) {
   const snapshot = await ref.limit(batchSize).get();
   if (snapshot.empty) return;

@@ -1,11 +1,11 @@
-# Link Marketing Solutions Firebase Backend Contract
+# Golden Marketing Services Firebase Backend Contract
 
 ## Canonical ownership
 
-- Backend project: `linkmarketing-agent-portal-crm`
+- Backend project: `gms-prod-1089114348316`
 - Firestore location: `nam5`
-- Website project: `linkmarketing-website` (public application/hosting boundary)
-- Customer project: `linkmarketing-customer-portal` (customer application/hosting boundary)
+- Website project: `golden-marketing-services` (public application/hosting boundary)
+- Customer project: `golden-marketing-services-customer` (customer application/hosting boundary)
 - Development uses the Firebase Emulator Suite and the demo project only.
 - Demo tenants are vertical-specific and isolated from production. The initial model is `firebase/demo/real-estate-demo.json` for a neutral Realtor demonstration. Golden Cross Realty remains a separate beta tenant. Future verticals reuse the same portal contracts with separate configuration and tenant data rather than sharing records.
 

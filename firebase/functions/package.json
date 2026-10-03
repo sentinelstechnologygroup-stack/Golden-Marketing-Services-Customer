@@ -1,5 +1,5 @@
 {
-  "name": "linkmarketing-backend-functions",
+  "name": "gms-backend-functions",
   "private": true,
   "main": "index.js",
   "engines": {
@@ -7,11 +7,11 @@
   },
   "scripts": {
     "serve": "firebase emulators:start --only auth,firestore,functions,storage",
-    "test:rules": "firebase emulators:exec --only auth,firestore,storage --project demo-linkmarketing-local \"npm run test:rules:raw\"",
+    "test:rules": "firebase emulators:exec --only auth,firestore,storage --project demo-gms-local \"npm run test:rules:raw\"",
     "test:rules:raw": "node --test --test-concurrency=1 tests/*.test.cjs",
     "provision:golden-cross": "node scripts/provision-golden-cross-beta.cjs",
     "provision:client-supervisor": "node scripts/provision-client-supervisor.cjs",
-    "provision:lms-super-admin": "node scripts/provision-lms-super-admin.cjs",
+    "provision:gms-super-admin": "node scripts/provision-gms-super-admin.cjs",
     "provision:agent-supervisor": "node scripts/provision-agent-supervisor.cjs",
     "provision:client-user": "node scripts/provision-client-user.cjs",
     "seed:emulator": "node scripts/seed-emulator.cjs",

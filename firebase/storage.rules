@@ -7,8 +7,8 @@ service firebase.storage {
         && firestore.get(/databases/(default)/documents/tenants/$(tenantId)/members/$(request.auth.uid)).data.active == true;
     }
 
-    function lmsSuperAdmin() {
-      return request.auth != null && ('lmsSuperAdmin' in request.auth.token) && request.auth.token.lmsSuperAdmin == true;
+    function gmsSuperAdmin() {
+      return request.auth != null && ('gmsSuperAdmin' in request.auth.token) && request.auth.token.gmsSuperAdmin == true;
     }
 
     function assignedAgent(tenantId) {
@@ -31,22 +31,22 @@ service firebase.storage {
     }
 
     match /tenants/{tenantId}/brands/{brandId}/{allPaths=**} {
-      allow read: if lmsSuperAdmin() || member(tenantId) || assignedBrand(tenantId, brandId);
-      allow create, update: if (lmsSuperAdmin() || member(tenantId) || assignedBrand(tenantId, brandId)) && supportedFile();
-      allow delete: if lmsSuperAdmin() || member(tenantId);
+      allow read: if gmsSuperAdmin() || member(tenantId) || assignedBrand(tenantId, brandId);
+      allow create, update: if (gmsSuperAdmin() || member(tenantId) || assignedBrand(tenantId, brandId)) && supportedFile();
+      allow delete: if gmsSuperAdmin() || member(tenantId);
     }
 
     match /tenants/{tenantId}/documents/{documentId}/{allPaths=**} {
-      allow read: if lmsSuperAdmin() || member(tenantId);
+      allow read: if gmsSuperAdmin() || member(tenantId);
       // Registration seals the file. New creative versions use new document IDs.
-      allow write: if (lmsSuperAdmin() || member(tenantId)) && supportedFile()
+      allow write: if (gmsSuperAdmin() || member(tenantId)) && supportedFile()
         && !firestore.exists(/databases/(default)/documents/tenants/$(tenantId)/documents/$(documentId));
     }
 
     match /tenants/{tenantId}/{folder}/{allPaths=**} {
-      allow read: if lmsSuperAdmin() || member(tenantId);
-      allow create, update: if folder != 'documents' && (lmsSuperAdmin() || member(tenantId)) && supportedFile();
-      allow delete: if folder != 'documents' && (lmsSuperAdmin() || member(tenantId));
+      allow read: if gmsSuperAdmin() || member(tenantId);
+      allow create, update: if folder != 'documents' && (gmsSuperAdmin() || member(tenantId)) && supportedFile();
+      allow delete: if folder != 'documents' && (gmsSuperAdmin() || member(tenantId));
     }
 
     match /{allPaths=**} { allow read, write: if false; }

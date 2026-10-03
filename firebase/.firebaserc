@@ -1,9 +1,7 @@
 {
   "projects": {
-    "default": "demo-linkmarketing-local",
-    "development": "demo-linkmarketing-local",
-    "backend-production": "linkmarketing-agent-portal-crm",
-    "website-hosting": "linkmarketing-website",
-    "customer-hosting": "linkmarketing-customer-portal"
+    "default": "demo-gms-local",
+    "development": "demo-gms-local",
+    "backend-production": "gms-prod-1089114348316"
   }
 }

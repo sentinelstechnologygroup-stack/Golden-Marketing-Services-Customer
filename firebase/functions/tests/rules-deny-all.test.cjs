@@ -15,7 +15,7 @@ let env;
 
 test.before(async () => {
   env = await initializeTestEnvironment({
-    projectId: 'demo-linkmarketing-local',
+    projectId: 'demo-gms-local',
     firestore: {
       rules: fs.readFileSync(path.join(rulesDir, 'firestore.rules'), 'utf8'),
     },
@@ -180,9 +180,9 @@ test('LMS super admin claim can audit tenants but cannot be granted from tenant 
   await env.withSecurityRulesDisabled(async (context) => {
     await setDoc(doc(context.firestore(), 'tenants/tenant-super/reports/report-super'), { tenantId: 'tenant-super', createdAt: '2026-01-01', updatedAt: '2026-01-01' });
   });
-  const privileged = env.authenticatedContext('lms-admin', { lmsSuperAdmin: true }).firestore();
+  const privileged = env.authenticatedContext('lms-admin', { gmsSuperAdmin: true }).firestore();
   await assertSucceeds(getDoc(doc(privileged, 'tenants/tenant-super/reports/report-super')));
-  const unprivileged = env.authenticatedContext('fake-lms-admin', { role: 'lms_super_admin' }).firestore();
+  const unprivileged = env.authenticatedContext('fake-lms-admin', { role: 'gms_super_admin' }).firestore();
   await assertFails(getDoc(doc(unprivileged, 'tenants/tenant-super/reports/report-super')));
 });
 

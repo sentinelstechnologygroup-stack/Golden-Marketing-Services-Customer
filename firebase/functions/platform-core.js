@@ -22,11 +22,11 @@ const ROLE_ALIASES = new Map([
   ['customer', 'client'],
   ['admin', 'client_admin'],
   ['supervisor', 'client_supervisor'],
-  ['super_admin', 'lms_super_admin'],
+  ['super_admin', 'gms_super_admin'],
 ]);
-const ROLES = new Set(['client', 'client_admin', 'client_supervisor', 'lms_super_admin', 'agent', 'auditor', ...ROLE_ALIASES.keys()]);
+const ROLES = new Set(['client', 'client_admin', 'client_supervisor', 'gms_super_admin', 'agent', 'auditor', ...ROLE_ALIASES.keys()]);
 const CLIENT_INVITE_ROLES = new Set(['client', 'client_admin', 'client_supervisor']);
-const TENANT_ADMIN_ROLES = ['client_admin', 'client_supervisor', 'lms_super_admin'];
+const TENANT_ADMIN_ROLES = ['client_admin', 'client_supervisor', 'gms_super_admin'];
 
 function normalizeRole(role) {
   return ROLE_ALIASES.get(role) || role;
@@ -104,16 +104,16 @@ async function getMembership(tenantId, uid) {
 async function requireMembership(request, tenantId, roles = null) {
   const caller = requireAuth(request);
   if (typeof tenantId !== 'string' || !tenantId.trim()) throw new HttpsError('invalid-argument', 'A tenantId is required.');
-  if (caller.token?.lmsSuperAdmin === true) return { caller, membership: { uid: caller.uid, tenantId, role: 'lms_super_admin', active: true } };
+  if (caller.token?.gmsSuperAdmin === true) return { caller, membership: { uid: caller.uid, tenantId, role: 'gms_super_admin', active: true } };
   const membership = await getMembership(tenantId, caller.uid);
   if (!membership || !roleAllowed(membership.role, roles)) throw new HttpsError('permission-denied', 'You are not authorized for this tenant.');
   return { caller, membership };
 }
 
-async function requireAgentAssignment(request, tenantId, roles = ['agent', 'client_supervisor', 'client_admin', 'lms_super_admin']) {
+async function requireAgentAssignment(request, tenantId, roles = ['agent', 'client_supervisor', 'client_admin', 'gms_super_admin']) {
   const caller = requireAuth(request);
   const membership = await getMembership(tenantId, caller.uid);
-  if (caller.token?.lmsSuperAdmin === true) return { caller, membership: { uid: caller.uid, tenantId, role: 'lms_super_admin', active: true }, assignment: null };
+  if (caller.token?.gmsSuperAdmin === true) return { caller, membership: { uid: caller.uid, tenantId, role: 'gms_super_admin', active: true }, assignment: null };
   if (membership && TENANT_ADMIN_ROLES.includes(normalizeRole(membership.role)) && roleAllowed(membership.role, roles)) return { caller, membership, assignment: null };
   const assignment = await db.doc(`agentUsers/${caller.uid}/assignments/${tenantId}`).get();
   const data = assignment.exists ? assignment.data() : null;
@@ -200,7 +200,7 @@ async function createTenantRecord({ request, tenantId, collectionName, data, rol
 // Minimal non-sensitive diagnostic only. Business operations are intentionally
 // absent until the shared API contract, authorization model, and tests are ready.
 exports.health = onRequest({ cors: false }, (_request, response) => {
-  response.status(200).json({ service: 'linkmarketing-backend', status: 'ok' });
+  response.status(200).json({ service: 'gms-backend', status: 'ok' });
 });
 
 // Firebase App Check is still being re-registered for the new GMS portal
@@ -236,7 +236,7 @@ exports.getMyProfile = onCall({ enforceAppCheck: false }, async (request) => {
     locale: profile.data()?.locale || null,
     disabled: user.disabled,
     mustChangePassword: user.customClaims?.mustChangePassword === true,
-    lmsSuperAdmin: caller.token?.lmsSuperAdmin === true,
+    gmsSuperAdmin: caller.token?.gmsSuperAdmin === true,
     memberships: memberships.docs.map((doc) => ({ id: doc.id, ...doc.data(), role: normalizeRole(doc.data().role) })),
     agentAssignments,
   };
@@ -244,7 +244,7 @@ exports.getMyProfile = onCall({ enforceAppCheck: false }, async (request) => {
 
 exports.getAccountWorkspace = onCall({ enforceAppCheck: false }, async (request) => {
   const { tenantId } = request.data || {};
-  const { caller, membership } = await requireMembership(request, tenantId, ['client', 'client_admin', 'client_supervisor', 'lms_super_admin']);
+  const { caller, membership } = await requireMembership(request, tenantId, ['client', 'client_admin', 'client_supervisor', 'gms_super_admin']);
   const [tenant, members, invitations, audits, profile] = await Promise.all([
     db.doc(`tenants/${tenantId}`).get(),
     db.collection(`tenants/${tenantId}/members`).limit(250).get(),
@@ -253,7 +253,7 @@ exports.getAccountWorkspace = onCall({ enforceAppCheck: false }, async (request)
     db.doc(`users/${caller.uid}`).get(),
   ]);
   const tenantData = tenant.exists ? tenant.data() : {};
-  const canManage = ['client_admin', 'client_supervisor', 'lms_super_admin'].includes(normalizeRole(membership.role));
+  const canManage = ['client_admin', 'client_supervisor', 'gms_super_admin'].includes(normalizeRole(membership.role));
   const userRows = await Promise.all(members.docs.map(async (memberDoc) => {
     const member = memberDoc.data();
     const userRecord = await auth.getUser(member.uid || memberDoc.id).catch(() => null);
@@ -298,7 +298,7 @@ exports.updateMyProfile = onCall({ enforceAppCheck: true }, async (request) => {
 
 exports.getSecurityWorkspace = onCall({ enforceAppCheck: false }, async (request) => {
   const { tenantId } = request.data || {};
-  const { caller } = await requireMembership(request, tenantId, ['client', 'client_admin', 'client_supervisor', 'lms_super_admin']);
+  const { caller } = await requireMembership(request, tenantId, ['client', 'client_admin', 'client_supervisor', 'gms_super_admin']);
   const [user, profile, audits] = await Promise.all([
     auth.getUser(caller.uid),
     db.doc(`users/${caller.uid}`).get(),
@@ -410,7 +410,7 @@ exports.createSupportRequest = onCall({ enforceAppCheck: true }, async (request)
   const { tenantId, subject, category = 'general', priority = 'normal', body } = request.data || {};
   if (typeof subject !== 'string' || !subject.trim() || typeof body !== 'string' || !body.trim()) throw new HttpsError('invalid-argument', 'subject and body are required.');
   const caller = requireAuth(request);
-  return createTenantRecord({ request, tenantId, collectionName: 'supportRequests', roles: ['client', 'client_admin', 'client_supervisor', 'lms_super_admin'], action: 'support.created', data: { subject: subject.trim(), type: category, category, priority, body: body.trim(), status: 'open', assigned: 'Queued - Link team', thread: [{ fromUid: caller.uid, from: caller.token?.name || caller.token?.email || 'Portal user', body: body.trim(), at: new Date().toISOString() }] } });
+  return createTenantRecord({ request, tenantId, collectionName: 'supportRequests', roles: ['client', 'client_admin', 'client_supervisor', 'gms_super_admin'], action: 'support.created', data: { subject: subject.trim(), type: category, category, priority, body: body.trim(), status: 'open', assigned: 'Queued - GMS team', thread: [{ fromUid: caller.uid, from: caller.token?.name || caller.token?.email || 'Portal user', body: body.trim(), at: new Date().toISOString() }] } });
 });
 
 exports.createBillingReview = onCall({ enforceAppCheck: true }, async (request) => {
@@ -430,7 +430,7 @@ exports.updateNotificationPreferences = onCall({ enforceAppCheck: true }, async 
 
 exports.getNotificationWorkspace = onCall({ enforceAppCheck: false }, async (request) => {
   const { tenantId } = request.data || {};
-  const { caller } = await requireMembership(request, tenantId, ['client', 'client_admin', 'client_supervisor', 'lms_super_admin']);
+  const { caller } = await requireMembership(request, tenantId, ['client', 'client_admin', 'client_supervisor', 'gms_super_admin']);
   const [preferences, notifications] = await Promise.all([
     db.doc(`tenants/${tenantId}/notificationPreferences/${caller.uid}`).get(),
     db.collection(`tenants/${tenantId}/notifications`).where('recipientUid', 'in', [caller.uid, 'all']).limit(100).get().catch(() => null),
@@ -445,7 +445,7 @@ exports.createDocumentMetadata = onCall({ enforceAppCheck: true }, async (reques
   const { tenantId, documentId, name, category, storagePath, contentType, sizeBytes } = request.data || {};
   if (typeof name !== 'string' || !name.trim() || typeof storagePath !== 'string' || !storagePath.startsWith(`tenants/${tenantId}/`)) throw new HttpsError('invalid-argument', 'A tenant-scoped name and storagePath are required.');
   if (typeof documentId !== 'string' || !documentId || !storagePath.startsWith(`tenants/${tenantId}/documents/${documentId}/`)) throw new HttpsError('invalid-argument', 'Document metadata must match its tenant-scoped Storage path.');
-  const { caller } = await requireMembership(request, tenantId, ['client', 'client_admin', 'client_supervisor', 'lms_super_admin']);
+  const { caller } = await requireMembership(request, tenantId, ['client', 'client_admin', 'client_supervisor', 'gms_super_admin']);
   const now = FieldValue.serverTimestamp();
   const record = { tenantId, name: name.trim(), category: category || 'general', storagePath, contentType: contentType || 'application/octet-stream', sizeBytes: Number(sizeBytes) || 0, status: 'available', createdBy: caller.uid, createdAt: now, updatedAt: now };
   await db.doc(`tenants/${tenantId}/documents/${documentId}`).set(record);
@@ -455,7 +455,7 @@ exports.createDocumentMetadata = onCall({ enforceAppCheck: true }, async (reques
 
 exports.addSupportReply = onCall({ enforceAppCheck: true }, async (request) => {
   const { tenantId, requestId, body } = request.data || {};
-  const { caller } = await requireMembership(request, tenantId, ['client', 'client_admin', 'client_supervisor', 'lms_super_admin']);
+  const { caller } = await requireMembership(request, tenantId, ['client', 'client_admin', 'client_supervisor', 'gms_super_admin']);
   if (typeof requestId !== 'string' || !requestId || typeof body !== 'string' || !body.trim()) throw new HttpsError('invalid-argument', 'A request and reply are required.');
   const ref = db.doc(`tenants/${tenantId}/supportRequests/${requestId}`);
   const snapshot = await ref.get();
@@ -505,7 +505,7 @@ function averageResponseMinutes(leads) {
 
 exports.getCustomerCollection = onCall({ enforceAppCheck: false }, async (request) => {
   const { tenantId, collectionName } = request.data || {};
-  const { membership } = await requireMembership(request, tenantId, ['client', 'client_admin', 'client_supervisor', 'lms_super_admin']);
+  const { membership } = await requireMembership(request, tenantId, ['client', 'client_admin', 'client_supervisor', 'gms_super_admin']);
   if (!['leads', 'callRecords', 'appointments', 'billing', 'invoices', 'documents', 'supportRequests'].includes(collectionName)) {
     throw new HttpsError('invalid-argument', 'Collection is not available to the customer portal.');
   }
@@ -517,7 +517,7 @@ exports.getCustomerCollection = onCall({ enforceAppCheck: false }, async (reques
 
 exports.getDashboardWorkspace = onCall({ enforceAppCheck: false }, async (request) => {
   const { tenantId } = request.data || {};
-  await requireMembership(request, tenantId, ['client', 'client_admin', 'client_supervisor', 'lms_super_admin']);
+  await requireMembership(request, tenantId, ['client', 'client_admin', 'client_supervisor', 'gms_super_admin']);
   const [tenant, leadsSnapshot, appointmentsSnapshot] = await Promise.all([
     db.doc(`tenants/${tenantId}`).get(),
     db.collection(`tenants/${tenantId}/leads`).where('tenantId', '==', tenantId).get(),
@@ -555,7 +555,7 @@ exports.getDashboardWorkspace = onCall({ enforceAppCheck: false }, async (reques
 
 exports.getLiveReport = onCall({ enforceAppCheck: false }, async (request) => {
   const { tenantId, range = null, comparison = null, rangeStart = null, rangeEnd = null } = request.data || {};
-  await requireMembership(request, tenantId, ['client', 'client_admin', 'client_supervisor', 'lms_super_admin']);
+  await requireMembership(request, tenantId, ['client', 'client_admin', 'client_supervisor', 'gms_super_admin']);
   const [leadsSnapshot, appointmentsSnapshot] = await Promise.all([
     db.collection(`tenants/${tenantId}/leads`).where('tenantId', '==', tenantId).get(),
     db.collection(`tenants/${tenantId}/appointments`).where('tenantId', '==', tenantId).get(),
@@ -668,7 +668,7 @@ exports.setIndustryConfig = onCall({ enforceAppCheck: true }, async (request) =>
   const caller = requireAuth(request);
   if (typeof industryId !== 'string' || !industryId || !config || typeof config !== 'object') throw new HttpsError('invalid-argument', 'industryId and config are required.');
   const current = await auth.getUser(caller.uid);
-  if (!current.customClaims?.lmsSuperAdmin && !current.customClaims?.platformAdmin) throw new HttpsError('permission-denied', 'LMS Super Admin access is required.');
+  if (!current.customClaims?.gmsSuperAdmin && !current.customClaims?.platformAdmin) throw new HttpsError('permission-denied', 'GMS Super Admin access is required.');
   const missing = INDUSTRY_POLICY_FIELDS.filter((field) => config[field] === undefined || config[field] === null);
   if (missing.length) throw new HttpsError('invalid-argument', `Missing policy fields: ${missing.join(', ')}`);
   await db.doc(`industryConfigs/${industryId}`).set({ ...config, industryId, updatedBy: caller.uid, updatedAt: FieldValue.serverTimestamp() }, { merge: true });

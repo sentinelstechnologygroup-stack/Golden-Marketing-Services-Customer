@@ -27,7 +27,7 @@ arbitrary destinations or choosing another tenant's caller ID. A server-selected
 browser dial instruction alone does not establish this security boundary.
 
 Deploy from firebase/firebase.json using the production project
-linkmarketing-agent-portal-crm. If Firebase CLI login fails, gcloud can deploy
+gms-prod-1089114348316. If Firebase CLI login fails, gcloud can deploy
 these same second-generation functions. Keep calling disabled during deployment.
 
 Inbound dispatch, voicemail, SMS delivery/opt-out callbacks, token refresh,

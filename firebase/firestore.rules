@@ -5,8 +5,8 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    function lmsSuperAdmin() {
-      return signedIn() && request.auth.token.lmsSuperAdmin == true;
+    function gmsSuperAdmin() {
+      return signedIn() && request.auth.token.gmsSuperAdmin == true;
     }
 
     function membership(tenantId) {
@@ -35,7 +35,7 @@ service cloud.firestore {
     }
 
     function canAccessTenant(tenantId) {
-      return lmsSuperAdmin() || membership(tenantId) || agentAssigned(tenantId);
+      return gmsSuperAdmin() || membership(tenantId) || agentAssigned(tenantId);
     }
 
     function tenantData(tenantId) {
@@ -47,7 +47,7 @@ service cloud.firestore {
     }
 
     function staffRole(tenantId) {
-      return lmsSuperAdmin() || role(tenantId) in ['admin', 'supervisor', 'client_admin', 'client_supervisor', 'agent', 'auditor'];
+      return gmsSuperAdmin() || role(tenantId) in ['admin', 'supervisor', 'client_admin', 'client_supervisor', 'agent', 'auditor'];
     }
 
     function operationalCollection(collection) {
@@ -60,25 +60,25 @@ service cloud.firestore {
 
     match /tenants/{tenantId} {
       allow read: if canAccessTenant(tenantId);
-      allow write: if lmsSuperAdmin() || (membership(tenantId) && role(tenantId) in ['admin', 'client_admin']);
+      allow write: if gmsSuperAdmin() || (membership(tenantId) && role(tenantId) in ['admin', 'client_admin']);
 
       match /members/{uid} {
-        allow read: if lmsSuperAdmin() || (membership(tenantId) && (uid == request.auth.uid || role(tenantId) in ['admin', 'supervisor', 'client_admin', 'client_supervisor']));
+        allow read: if gmsSuperAdmin() || (membership(tenantId) && (uid == request.auth.uid || role(tenantId) in ['admin', 'supervisor', 'client_admin', 'client_supervisor']));
         allow write: if false;
       }
 
       match /auditLogs/{auditId} {
-        allow read: if lmsSuperAdmin() || membership(tenantId) || agentAssigned(tenantId);
+        allow read: if gmsSuperAdmin() || membership(tenantId) || agentAssigned(tenantId);
         allow write: if false;
       }
 
       match /{collection}/{documentId} {
         allow read: if canAccessTenant(tenantId)
-          && (lmsSuperAdmin() || (collection != 'integrations' && !(collection == 'config' && documentId == 'onboarding')))
+          && (gmsSuperAdmin() || (collection != 'integrations' && !(collection == 'config' && documentId == 'onboarding')))
           && collection != 'members'
           && collection != 'auditLogs'
-          && (!agentAssigned(tenantId) || lmsSuperAdmin() || membership(tenantId) || agentBrandAllowed(tenantId))
-          && (lmsSuperAdmin() || agentAssigned(tenantId) || (membership(tenantId) && (role(tenantId) in ['admin', 'supervisor', 'client_admin', 'client_supervisor', 'auditor'] || (role(tenantId) in ['customer', 'client'] && customerReadable(collection)))));
+          && (!agentAssigned(tenantId) || gmsSuperAdmin() || membership(tenantId) || agentBrandAllowed(tenantId))
+          && (gmsSuperAdmin() || agentAssigned(tenantId) || (membership(tenantId) && (role(tenantId) in ['admin', 'supervisor', 'client_admin', 'client_supervisor', 'auditor'] || (role(tenantId) in ['customer', 'client'] && customerReadable(collection)))));
         allow create: if membership(tenantId)
           && collection != 'members'
           && collection != 'auditLogs'
@@ -105,7 +105,7 @@ service cloud.firestore {
     }
 
     match /users/{uid} {
-      allow read: if signedIn() && (uid == request.auth.uid || lmsSuperAdmin());
+      allow read: if signedIn() && (uid == request.auth.uid || gmsSuperAdmin());
       allow write: if false;
     }
 

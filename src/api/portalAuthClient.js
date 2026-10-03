@@ -14,7 +14,7 @@ const getToken = () => {
 }
 
 const appPublicSettings = {
-  id: "link-marketing-solutions-customer",
+  id: "golden-marketing-services-customer",
   public_settings: {},
 }
 

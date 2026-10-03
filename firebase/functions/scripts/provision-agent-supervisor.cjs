@@ -2,7 +2,7 @@ const { initializeApp, applicationDefault } = require('firebase-admin/app');
 const { getAuth } = require('firebase-admin/auth');
 const { FieldValue, getFirestore } = require('firebase-admin/firestore');
 
-const PROJECT_ID = process.env.GCLOUD_PROJECT || 'linkmarketing-agent-portal-crm';
+const PROJECT_ID = process.env.GCLOUD_PROJECT || 'gms-prod-1089114348316';
 const tenantId = process.env.AGENT_SUPERVISOR_TENANT_ID || 'tenant-golden-cross-beta';
 const brandId = process.env.AGENT_SUPERVISOR_BRAND_ID || 'brand-golden-cross-realty';
 const email = String(process.env.AGENT_SUPERVISOR_EMAIL || '').trim().toLowerCase();
@@ -52,7 +52,7 @@ async function main() {
     permissions: ['queue.manage', 'lead.assign', 'report.view'],
     role: 'supervisor',
     status: 'active',
-    assignedBy: 'lms-super-admin-provisioning',
+    assignedBy: 'gms-super-admin-provisioning',
     createdAt: now,
     updatedAt: now,
   };
@@ -80,7 +80,7 @@ async function main() {
   batch.set(tenantRef.collection('auditLogs').doc(), {
     tenantId,
     brandId,
-    actorUid: 'lms-super-admin-provisioning',
+    actorUid: 'gms-super-admin-provisioning',
     action: created ? 'agent_supervisor.provisioned' : 'agent_supervisor.refreshed',
     target: user.uid,
     metadata: { role: 'supervisor' },

@@ -2,7 +2,7 @@ const { initializeApp, applicationDefault } = require('firebase-admin/app');
 const { getAuth } = require('firebase-admin/auth');
 const { FieldValue, getFirestore } = require('firebase-admin/firestore');
 
-const PROJECT_ID = process.env.GCLOUD_PROJECT || 'linkmarketing-agent-portal-crm';
+const PROJECT_ID = process.env.GCLOUD_PROJECT || 'gms-prod-1089114348316';
 const tenantId = process.env.CLIENT_USER_TENANT_ID || 'tenant-golden-cross-beta';
 const brandId = process.env.CLIENT_USER_BRAND_ID || 'brand-golden-cross-realty';
 const email = String(process.env.CLIENT_USER_EMAIL || '').trim().toLowerCase();
@@ -54,14 +54,14 @@ async function main() {
     role: 'client',
     active: true,
     brandIds: [brandId],
-    invitedBy: 'lms-super-admin-provisioning',
+    invitedBy: 'gms-super-admin-provisioning',
     createdAt: now,
     updatedAt: now,
   }, { merge: true });
   batch.set(tenantRef.collection('auditLogs').doc(), {
     tenantId,
     brandId,
-    actorUid: 'lms-super-admin-provisioning',
+    actorUid: 'gms-super-admin-provisioning',
     action: created ? 'client.provisioned' : 'client.membership_refreshed',
     target: user.uid,
     metadata: { role: 'client' },

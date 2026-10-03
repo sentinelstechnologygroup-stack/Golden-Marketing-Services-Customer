@@ -5,7 +5,7 @@ if (process.env.CONFIRM_GMS_INITIAL_ADMIN !== 'yes') throw new Error('Explicit a
 const email = String(process.env.GMS_INITIAL_ADMIN_EMAIL || '').trim().toLowerCase();
 const password = String(process.env.GMS_INITIAL_ADMIN_PASSWORD || '');
 if (!email.includes('@') || password.length < 8) throw new Error('Email and temporary password are required.');
-initializeApp({ projectId: 'linkmarketing-agent-portal-crm', credential: applicationDefault() });
+initializeApp({ projectId: 'gms-prod-1089114348316', credential: applicationDefault() });
 (async () => {
   const auth = getAuth();
   try {

@@ -17,10 +17,10 @@ test('tenant channels and user preferences control email delivery', () => {
 });
 
 test('notification email excludes protected records and escapes content', () => {
-  const email = buildNotificationEmail({ title: '<Lead ready>', body: '<script>private</script>', portalUrl: 'https://customer.linkmarketingservices.co/' });
+  const email = buildNotificationEmail({ title: '<Lead ready>', body: '<script>private</script>', portalUrl: 'https://customer.goldenmarketingservices.com/' });
   assert.equal(email.subject, '<Lead ready>');
   assert.match(email.html, /&lt;Lead ready&gt;/);
   assert.match(email.html, /&lt;script&gt;private&lt;\/script&gt;/);
   assert.doesNotMatch(email.html, /<script>/);
-  assert.match(email.text, /customer\.linkmarketingservices\.co\/notifications/);
+  assert.match(email.text, /customer\.goldenmarketingservices\.com\/notifications/);
 });

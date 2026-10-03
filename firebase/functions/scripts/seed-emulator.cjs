@@ -1,7 +1,7 @@
 const { initializeApp } = require('firebase-admin/app');
 const { getFirestore, FieldValue } = require('firebase-admin/firestore');
 
-initializeApp({ projectId: 'demo-linkmarketing-local' });
+initializeApp({ projectId: 'demo-gms-local' });
 const db = getFirestore();
 
 const COLLECTIONS = [

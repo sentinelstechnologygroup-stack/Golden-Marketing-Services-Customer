@@ -27,13 +27,13 @@ exports.completeInitialPasswordChange = onCall({ enforceAppCheck: false, maxInst
   for (const tenant of tenants.docs) {
     const assignmentId = `${user.uid}__${tenant.id}`;
     const assignment = { assignmentId, agentUid: user.uid, tenantId: tenant.id, tenantName: tenant.data().name || tenant.id, role: 'admin', scope: 'all', brandId: null, brandIds: [], campaignIds: [], sourceIds: [], permissions: ['*'], status: 'active', assignedBy: 'gms-admin-bootstrap', createdAt: now, updatedAt: now };
-    batch.set(db.doc(`tenants/${tenant.id}/members/${user.uid}`), { uid: user.uid, tenantId: tenant.id, tenantName: assignment.tenantName, email: user.email, displayName: user.displayName, role: 'lms_super_admin', active: true, brandIds: [], createdAt: now, updatedAt: now }, { merge: true });
+    batch.set(db.doc(`tenants/${tenant.id}/members/${user.uid}`), { uid: user.uid, tenantId: tenant.id, tenantName: assignment.tenantName, email: user.email, displayName: user.displayName, role: 'gms_super_admin', active: true, brandIds: [], createdAt: now, updatedAt: now }, { merge: true });
     batch.set(db.doc(`agentAssignments/${assignmentId}`), assignment, { merge: true });
     batch.set(db.doc(`agentUsers/${user.uid}/assignments/${tenant.id}`), assignment, { merge: true });
     batch.set(db.collection(`tenants/${tenant.id}/auditLogs`).doc(), { tenantId: tenant.id, actorUid: user.uid, action: 'gms_super_admin.initial_setup.completed', target: user.uid, createdAt: now, occurredAt: now });
   }
   await batch.commit();
-  const claims = { ...user.customClaims, lmsSuperAdmin: true, platformAdmin: true, mustChangePassword: false };
+  const claims = { ...user.customClaims, gmsSuperAdmin: true, platformAdmin: true, mustChangePassword: false };
   delete claims.initialAdminSetup;
   await auth.setCustomUserClaims(user.uid, claims);
   await auth.revokeRefreshTokens(user.uid);

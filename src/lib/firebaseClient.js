@@ -10,12 +10,12 @@ const env = (key) => import.meta.env?.[key] || "";
 // Public Firebase web configuration for the existing production backend.
 // Vercel variables still override these values when configured.
 const DEFAULT_FIREBASE_CONFIG = {
-  apiKey: "AIzaSyAHNMYWtu7RkVe0apq94oB271_sXvIIWXE",
-  authDomain: "linkmarketing-agent-portal-crm.firebaseapp.com",
-  projectId: "linkmarketing-agent-portal-crm",
-  storageBucket: "linkmarketing-agent-portal-crm.firebasestorage.app",
-  messagingSenderId: "1089114348316",
-  appId: "1:1089114348316:web:6d1cf9944ca6ef1cc778d9",
+  apiKey: "AIzaSyA9qG9fo-PtTjSCNU8nH6H3JFfOB8uoSWc",
+  authDomain: "gms-prod-1089114348316.firebaseapp.com",
+  projectId: "gms-prod-1089114348316",
+  storageBucket: "gms-prod-1089114348316.firebasestorage.app",
+  messagingSenderId: "852174491354",
+  appId: "1:852174491354:web:2a343214aa5cc41c7b5fe3",
 };
 
 export const firebaseConfig = {
