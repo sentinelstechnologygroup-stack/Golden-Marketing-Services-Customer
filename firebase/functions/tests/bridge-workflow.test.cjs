@@ -131,6 +131,20 @@ test('existing-route ingestion, Agent workflow, Customer projection, and Brand i
   const communicationsHealth = await functions.communications.run(agentRequest({ action: 'health_check' }));
   assert.equal(communicationsHealth.ok, true);
   assert.equal(communicationsHealth.configured, false);
+  assert.equal(communicationsHealth.healthy, false);
+  await assert.rejects(
+    functions.communications.run(agentRequest({ action: 'start_call', params: { leadId, to: '+15555550100' } })),
+    (error) => error.code === 'failed-precondition' && error.message === 'Calling has not been activated.',
+  );
+  // Emulator-only configuration reaches ownership checks without contacting Telnyx.
+  Object.assign(process.env, {
+    TELEPHONY_PROVIDER: 'telnyx', TELEPHONY_ENABLED: 'true',
+    TELNYX_API_KEY: 'emulator-only-token', TELNYX_CONNECTION_ID: 'emulator-connection',
+    TELNYX_PUBLIC_KEY: Buffer.alloc(32).toString('base64'),
+    TELNYX_STATUS_WEBHOOK_URL: 'https://example.test/webhook',
+    TELEPHONY_STATUS_URL: 'https://example.test/webhook',
+    TELNYX_DIALING_RESTRICTIONS_VERIFIED: 'true', TELEPHONY_WARM_TRANSFER_ENABLED: 'false',
+  });
   await assert.rejects(
     functions.communications.run(agentRequest({
       action: 'start_call',
@@ -138,6 +152,7 @@ test('existing-route ingestion, Agent workflow, Customer projection, and Brand i
     })),
     (error) => error.code === 'permission-denied',
   );
+  await functions.communications.run(agentRequest({ action: 'claim_lead', params: { leadId } }));
   await assert.rejects(
     functions.communications.run(agentRequest({
       action: 'start_call',
@@ -160,7 +175,7 @@ test('existing-route ingestion, Agent workflow, Customer projection, and Brand i
       action: 'warm_transfer',
       params: { callId: 'workflow-call', transferTo: '+15555550999' },
     })),
-    (error) => error.code === 'permission-denied',
+    (error) => error.code === 'failed-precondition' && /Warm transfer/.test(error.message),
   );
   await assert.rejects(
     functions.communications.run(agentRequest({
@@ -169,6 +184,7 @@ test('existing-route ingestion, Agent workflow, Customer projection, and Brand i
     })),
     (error) => error.code === 'failed-precondition',
   );
+  process.env.TELEPHONY_ENABLED = 'false';
 
   const beforeTransition = await leadRef.get();
   await functions.transitionLead.run(agentRequest({ leadId, status: 'qualified', disposition: 'qualified', note: 'Qualified in emulator workflow.' }));
