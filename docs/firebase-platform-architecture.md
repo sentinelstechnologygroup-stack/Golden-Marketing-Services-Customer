@@ -1,4 +1,4 @@
-# GMS shared Firebase architecture
+# GMS independent Firebase architecture
 
 The GMS backend is gms-prod-1089114348316, display name GMS Production, project number 852174491354. It has independent Authentication, Firestore, Storage, Functions, service accounts and secrets. LMS is a separate product and no LMS runtime resources are shared.
 
@@ -6,7 +6,7 @@ The GMS backend is gms-prod-1089114348316, display name GMS Production, project 
 | --- | --- | --- |
 | GMS Website | 1:852174491354:web:622943755a30ad887b5fe3 | www.goldenmarketingservices.com |
 | GMS Customer Portal | 1:852174491354:web:2a343214aa5cc41c7b5fe3 | customer.goldenmarketingservices.com |
-| GMS Agent CRM | 1:852174491354:web:4d7468295ba977987b5fe3 | gentcrm.goldenmarketingservices.com |
+| GMS Agent CRM | 1:852174491354:web:4d7468295ba977987b5fe3 | agentcrm.goldenmarketingservices.com |
 
 These hosts are required registration targets, not a claim that Auth/App Check
 registration has been verified in the cloud. Both portals can initialize
