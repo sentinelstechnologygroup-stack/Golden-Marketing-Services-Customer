@@ -1,0 +1,56 @@
+name: Application quality
+on:
+  pull_request:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+concurrency:
+  group: quality-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm run test:exports
+      - run: npm run build
+      - name: Record validation evidence
+        if: always()
+        env:
+          VALIDATION_STATUS: ${{ job.status }}
+        run: |
+          mkdir -p verification
+          node -e 'require("fs").writeFileSync("verification/ci.json", JSON.stringify({commit:process.env.GITHUB_SHA,run:process.env.GITHUB_RUN_ID,status:process.env.VALIDATION_STATUS,node:process.version},null,2))'
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: validation-evidence
+          path: verification/
+          retention-days: 90
+  backend-rules:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: firebase/functions/package-lock.json
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - run: npm ci
+        working-directory: firebase/functions
+      - run: npm run test:rules
+        working-directory: firebase/functions
