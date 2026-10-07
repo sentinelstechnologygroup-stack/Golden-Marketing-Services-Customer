@@ -11,6 +11,24 @@ function verifiedToken(value,expected,now=Date.now()) {
   if(typeof value.access_token!=='string' || value.access_token.length<20 || typeof value.refresh_token!=='string' || value.refresh_token.length<20 || !Number.isFinite(value.expires_in) || value.expires_in<300 || value.expires_in>172800) throw new Error('Invalid authorization response.');
   return {accessToken:value.access_token,refreshToken:value.refresh_token,locationId:value.locationId,companyId:value.companyId,scopes:[...scopes].sort(),expiresAtMs:now+value.expires_in*1000,rotatedAtMs:now};
 }
+function verifiedAgencyToken(value,expected,now=Date.now()) {
+  if(value?.userType!=='Company' || value.companyId!==expected.companyId || value.installToFutureLocations===true) throw new Error('Authorization agency mismatch.');
+  // Validate the same credentials, lifetime and exact scopes without treating
+  // this transient agency token as a usable customer credential.
+  verifiedToken({...value,userType:'Location',locationId:expected.locationId},expected,now);
+  return value.access_token;
+}
+async function resolveAuthorization(value,expected,{deriveLocation,readProfile},now=Date.now()) {
+  if(value?.userType==='Location') return verifiedToken(value,expected,now);
+  const agencyAccessToken=verifiedAgencyToken(value,expected,now);
+  const location=await deriveLocation(agencyAccessToken,expected);
+  if(location?.locationId!==expected.locationId || (location.companyId && location.companyId!==expected.companyId) || (location.userType && location.userType!=='Location')) throw new Error('Authorization ownership mismatch.');
+  // v3 location-token responses may omit companyId and userType. Resolve the
+  // company through an authenticated location profile before normalization.
+  const profile=await readProfile(location.access_token,expected.locationId);
+  if(profile?.id!==expected.locationId || profile.companyId!==expected.companyId) throw new Error('Authorization profile mismatch.');
+  return verifiedToken({...location,userType:'Location',companyId:profile.companyId},expected,now);
+}
 function installUrl(base,client,state) {
   stateHash(state);
   const url=new URL(base);
@@ -22,4 +40,4 @@ function installUrl(base,client,state) {
   url.searchParams.set('state',state);
   return url.toString();
 }
-module.exports={SCOPES,stateHash,verifiedToken,installUrl};
+module.exports={SCOPES,stateHash,verifiedToken,verifiedAgencyToken,resolveAuthorization,installUrl};

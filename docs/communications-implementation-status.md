@@ -3,6 +3,26 @@
 Production remains gated. Passing software checks is not proof of live audio,
 message delivery, recording continuity or successful client access.
 
+## October 7 OAuth callback correction
+
+The first fresh agency-admin installation reached the owned callback but failed
+before a credential was saved. Its state was marked `needs_reconciliation`.
+The previous handler discarded the failure detail, so the exact original
+exception cannot be recovered from that state. The code nevertheless had a
+confirmed incompatibility with GHL's documented agency installation flow:
+it requested and accepted only Location tokens, whereas agency installation
+returns a Company token that must be converted for the selected location.
+
+The corrected callback requests the Company grant, validates agency ownership
+and the exact approved scopes, derives only the state-bound GCR location token,
+and verifies its authenticated profile and company before storage. The transient
+agency grant is never persisted; only the verified Location token and its refresh
+token enter the existing per-location GMS secret. Existing Location refresh logic
+and all calling/messaging gates remain unchanged. Fixed failure-stage names and
+numeric HTTP statuses provide diagnostics without logging credential values or
+provider bodies. Six focused policy tests pass. Successful live reauthorization
+and actual token refresh still require verification; the old code is not replayed.
+
 ## Ownership and approved scope
 
 Only GMS-Golden Cross Realty location `1nMOAalgP22erJpYc5dv` connects to tenant
