@@ -354,7 +354,7 @@ const getLead = async (id) => {
   if (isFirebaseMode) {
     const [leads, calls] = await Promise.all([getTenantRows("leads"), getTenantRows("callRecords")]);
     const row = leads.find((item) => item.id === id);
-    return row ? {...normalizeLeadRow(row), calls:(calls || []).filter((call)=>call.leadId===id).map((call)=>({id:call.id,status:call.status,startedAt:asIso(call.startedAt || call.createdAt),endedAt:asIso(call.endedAt),from:call.from,recordingStatus:call.recordingStatus || null,recordingUrl:call.recordingUrl || null,transferStatus:call.transferStatus || null}))} : null;
+    return row ? {...normalizeLeadRow(row), calls:(calls || []).filter((call)=>call.leadId===id).map((call)=>({id:call.id,provider:call.provider,status:call.status,startedAt:asIso(call.startedAt || call.createdAt),endedAt:asIso(call.endedAt),from:call.from,recordingStatus:call.recordingStatus || null,recordingUrl:call.recordingUrl || null,transferStatus:call.transferStatus || null}))} : null;
   }
   return request("GET", `/leads/${id}`);
 };
@@ -478,6 +478,8 @@ export const portalAdapter = {
     },
   },
   getDashboard, getLeads, getLead, getAppointments, getReports, getBilling, getInvoice,
+  getCallEvidence: (callId) => callTenantFunction('getGmsCallEvidence', {callId}),
+  getCallRecordingDownload: (callId, recordingId) => callTenantFunction('getGmsCallRecordingDownload', {callId,recordingId}),
   createBillingReview, getDocuments, createDocument, downloadDocument, getSupport, createSupport, addSupportReply,
   getNotifications, updateNotifications, getSecurity, updateSecuritySettings, revokeAllSessions, requestCurrentPasswordReset, getAccount, inviteUser,
   updateMyProfile, updateBusinessProfile, updateMemberRole, setMemberStatus,

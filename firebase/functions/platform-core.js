@@ -605,6 +605,8 @@ exports.getAgentCollection = onCall({ enforceAppCheck: false }, async (request) 
 exports.createAgentRecord = onCall({ enforceAppCheck: true }, async (request) => {
   const { tenantId, collectionName, data } = request.data || {};
   if (!AGENT_COLLECTIONS.has(collectionName) || collectionName === 'auditLogs') throw new HttpsError('invalid-argument', 'Collection is not writable through the CRM API.');
+  if((collectionName==='callRecords' && data?.provider==='telnyx') ||
+    (['callTranscripts','callQualityReviews'].includes(collectionName) && (data?.aiGenerated===true || data?.managedBy==='recording_worker'))) throw new HttpsError('permission-denied','Provider evidence is created by the backend.');
   const roles = writeRolesFor(collectionName);
   if (!roles.length) throw new HttpsError('permission-denied', 'This collection is not writable through the CRM API.');
   const authorization = await requireAgentAssignment(request, tenantId, roles);
@@ -626,6 +628,14 @@ exports.updateAgentRecord = onCall({ enforceAppCheck: true }, async (request) =>
   if (current.data().managedBy === 'onboarding') throw new HttpsError('failed-precondition', 'Update this configuration in Agent Portal > Clients > onboarding.');
   requireAssignmentBrand(assignment, recordBrandId(current.data()));
   const patch = stripImmutablePatch(data);
+  if(['callTranscripts','callQualityReviews'].includes(collectionName) &&
+    (current.data().aiGenerated===true || current.data().managedBy==='recording_worker' || patch.aiGenerated===true || patch.managedBy==='recording_worker')) throw new HttpsError('permission-denied','AI evidence is managed by the backend. Add a separate human review.');
+  if (collectionName === 'callRecords' && current.data().provider === 'telnyx') {
+    const protectedFields = ['provider', 'providerCallId', 'agentCallId', 'agentUid', 'agentId', 'leadId', 'from', 'destination', 'direction', 'status', 'agentLegStatus', 'leadDialStatus', 'recordingPolicy', 'recordingConsent', 'recordingRequested', 'recordingStatus', 'recordingStoragePath', 'startedAt', 'endedAt'];
+    if (Object.keys(patch).some(field => protectedFields.includes(field) || field.startsWith('recording') || field.startsWith('provider'))) {
+      throw new HttpsError('permission-denied', 'Calling and recording evidence are managed by the backend.');
+    }
+  }
   await recordRef.update({ ...patch, updatedAt: FieldValue.serverTimestamp(), updatedBy: caller.uid });
   await recordAudit({ tenantId, actorUid: caller.uid, action: `crm.${collectionName}.updated`, target: recordId });
   return { id: recordId, ...current.data(), ...patch };
@@ -742,8 +752,16 @@ exports.communications = onCall({ enforceAppCheck: true, secrets: [telnyxApiKey]
   if (typeof tenantId!=='string' || !tenantId || tenantId.includes('/')) throw new HttpsError('invalid-argument','Invalid tenant.');
   for (const id of [params.callId,params.leadId]) if (id !== undefined && (typeof id!=='string' || !id || id.includes('/'))) throw new HttpsError('invalid-argument','Invalid record identifier.');
   const roles = adminCheck ? ['admin', 'supervisor'] : ['admin', 'supervisor', 'agent'];
+  const authenticated=requireAuth(request);
+  const freshUser=await auth.getUser(authenticated.uid);
+  if(freshUser.disabled || freshUser.customClaims?.mustChangePassword) throw new HttpsError('permission-denied','Account access is unavailable.');
+  // Privileged claims are evaluated against the current account, not an older
+  // browser token retained after an administrator revokes access.
+  request={...request,auth:{...authenticated,token:{...authenticated.token,gmsSuperAdmin:freshUser.customClaims?.gmsSuperAdmin===true}}};
   const { caller, assignment } = await requireAgentAssignment(request, tenantId, roles);
   if (!['health_check', 'start_call', 'bind_call', 'end_call', 'hold_call', 'resume_call', 'warm_transfer', 'claim_lead', 'release_lead', 'set_availability', 'start_consultation', 'complete_transfer', 'cancel_transfer', 'mute_call', 'browser_session', 'send_sms', 'start_recording', 'call_status'].includes(action)) throw new HttpsError('invalid-argument', 'Unsupported communications action.');
+  if(action==='send_sms') throw new HttpsError('failed-precondition','Use the approved CRM messaging workflow for SMS.');
+  if(action==='start_recording') throw new HttpsError('failed-precondition','Recording is started by verified call events under the configured policy.');
   if (action === 'health_check') {
     try { const provider = phoneProvider(); const issues = require('./telephony/readiness.cjs').configurationIssues(process.env); const healthy = process.env.TELEPHONY_ENABLED === 'true' && issues.length === 0; return {ok:true, configured:issues.length===0, healthy, mode:healthy?'production':'unavailable', provider:provider.name, recordingPolicy:process.env.DEFAULT_RECORDING_POLICY || 'record_on_consent', warmTransferEnabled:healthy && process.env.TELEPHONY_WARM_TRANSFER_ENABLED==='true', actorUid:caller.uid, ...(!healthy?{warning:'Calling is awaiting verified phone-service configuration.'}:{})}; }
     catch { return {ok:true,configured:false,healthy:false,mode:'unavailable',warning:'Calling is awaiting phone-service configuration.'}; }
@@ -779,7 +797,7 @@ exports.communications = onCall({ enforceAppCheck: true, secrets: [telnyxApiKey]
     const provision=await db.doc(`agentUsers/${caller.uid}/assignments/${tenantId}`).get();
     const {browserSession}=require('./telephony/browser-session.cjs');
     const name=provider.name;
-    const config={token:telnyxApiKey.value()};
+    const config={token:telnyxApiKey.value(),browserConnectionId:process.env.TELNYX_BROWSER_CONNECTION_ID};
     try { return await browserSession(name,config,`gms_${caller.uid}`,provision.data() || {}); } catch { throw new HttpsError('failed-precondition','Agent browser calling is not provisioned.'); }
   }
   const callSid = typeof params.callId === 'string' ? params.callId : '';
@@ -858,9 +876,28 @@ exports.communications = onCall({ enforceAppCheck: true, secrets: [telnyxApiKey]
     if (!number?.phoneNumber) throw new HttpsError('failed-precondition','Configure an active client phone number for the selected provider.');
     if (leadData.disposition==='do_not_call' || leadData.doNotCall===true) throw new HttpsError('failed-precondition','This contact cannot be called.');
     const brandSnapshot=await db.doc(`tenants/${tenantId}/brands/${brandId}`).get();
+    const agentProvision=(await db.doc(`agentUsers/${caller.uid}/assignments/${tenantId}`).get()).data();
+    let agentSipDestination,agentSipUsername;
+    try {
+      if(!agentProvision?.telnyxCredentialId) throw new Error();
+      const credential=await provider.credential(agentProvision.telnyxCredentialId);
+      if(credential.connection_id!==process.env.TELNYX_BROWSER_CONNECTION_ID) throw new Error();
+      agentSipUsername=credential.sip_username;
+      agentSipDestination=require('./telephony/server-dial.cjs').agentDestination(agentSipUsername);
+    } catch {throw new HttpsError('failed-precondition','Agent browser identity is not provisioned.');}
     const recordingPolicy=brandSnapshot.data()?.recordingPolicy || process.env.DEFAULT_RECORDING_POLICY || 'record_on_consent';
     if(!['do_not_record','record_on_consent','record_all'].includes(recordingPolicy)) throw new HttpsError('failed-precondition','The Brand recording policy is invalid.');
     if(recordingPolicy==='record_on_consent' && params.recordingConsent!==true) throw new HttpsError('failed-precondition','Confirm the approved recording disclosure before calling.');
+    if(recordingPolicy!=='do_not_record' && process.env.GMS_RECORDING_PIPELINE_READY!=='true') throw new HttpsError('failed-precondition','Private call evidence configuration must pass before recording calls.');
+    const qualificationFormId=leadData.qualificationFormId || brandSnapshot.data()?.qualificationFormId || null;
+    let qualificationRubric=null,qualificationRubricVersion=null;
+    if(qualificationFormId) {
+      if(!/^[A-Za-z0-9_-]{1,128}$/.test(qualificationFormId)) throw new HttpsError('failed-precondition','The qualification form identifier is invalid.');
+      const form=(await db.doc(`tenants/${tenantId}/qualificationForms/${qualificationFormId}`).get()).data();
+      if(!form || form.brandId!==brandId || !['active','approved'].includes(form.status)) throw new HttpsError('failed-precondition','An approved Brand qualification form is required.');
+      qualificationRubric=require('./telephony/scorecard-policy.cjs').rubricItems(form);
+      qualificationRubricVersion=form.version || 1;
+    }
     const leadRef=leadSnapshot.ref;
     await db.runTransaction(async tx=>{
       const latest=await tx.get(leadRef); const value=latest.data();
@@ -871,7 +908,7 @@ exports.communications = onCall({ enforceAppCheck: true, secrets: [telnyxApiKey]
     // provider records before retrying, to avoid duplicate real calls.
     if(provider.name==='telnyx') {
       callId=crypto.randomUUID();
-      result={status:'prepared',dial:{to:leadData.phone,from:number.phoneNumber,clientState:Buffer.from(JSON.stringify({gmsCallId:callId,tenantId})).toString('base64')}};
+      result={status:'dialing_agent'};
     } else {
       result = await provider.start({to:leadData.phone,from:number.phoneNumber,voiceUrl:process.env.TELEPHONY_VOICE_URL,callbackUrl:process.env.TELEPHONY_STATUS_URL,commandId:crypto.randomUUID()});
       callId = result.id;
@@ -883,10 +920,27 @@ exports.communications = onCall({ enforceAppCheck: true, secrets: [telnyxApiKey]
       clientContactId: leadData.routedClientContactId || null,
       from:number.phoneNumber, direction: 'outbound', destination: String(params.to).slice(0, 80), status: result.status || 'queued',
       recordingPolicy, recordingConsent:params.recordingConsent===true, recordingRequested:recordingPolicy!=='do_not_record', recordingStatus:null,
+      agentLegStatus:'requested',leadDialStatus:null,
       startedAt: FieldValue.serverTimestamp(), endedAt: null, createdBy: caller.uid,
       createdAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp(),
     });
+    await db.doc(`gmsCallBindings/${callId}`).create({callPath:callRef.path,tenantId,brandId,
+      campaignId:leadData.campaignId || leadData.campaign_id || null,leadId,agentUid:caller.uid,
+      recordingPolicy,recordingConsent:params.recordingConsent===true,recordingRequested:recordingPolicy!=='do_not_record',
+      qualificationFormId,qualificationRubric,qualificationRubricVersion,
+      from:number.phoneNumber,destination:String(params.to),agentSipDestination,createdAt:FieldValue.serverTimestamp()});
     await leadRef.update({activeCallId:callId,callStartPending:false});
+    try {
+      const dial=require('./telephony/server-dial.cjs').agentDial(callId,{...(await callRef.get()).data(),agentSipUsername},process.env.TELEPHONY_STATUS_URL);
+      const agentLeg=await provider.start(dial);
+      if(!agentLeg.id) throw new Error('Missing agent call identity.');
+      await callRef.update({agentCallId:agentLeg.id});
+    } catch {
+      // Retain the lead lock until reconciled: a timed-out request may have placed
+      // the agent leg, and must not be repeated under a new command identifier.
+      await callRef.update({status:'needs_reconciliation'});
+      throw new HttpsError('unavailable','Agent call setup needs reconciliation before retrying.');
+    }
   } else if (action === 'end_call') {
     callRef = db.doc(`tenants/${tenantId}/callRecords/${callSid}`);
     const callSnapshot = await callRef.get();
@@ -895,8 +949,8 @@ exports.communications = onCall({ enforceAppCheck: true, secrets: [telnyxApiKey]
     leadId = callSnapshot.data().leadId || '';
     requireAssignmentBrand(assignment, brandId);
     if (callSnapshot.data().provider !== provider.name || callSnapshot.data().agentUid !== caller.uid) throw new HttpsError('permission-denied','Call ownership or provider mismatch.');
-    if(!callSnapshot.data().providerCallId) throw new HttpsError('failed-precondition','The browser call has not connected to the phone service.');
-    result = await provider.end(callSnapshot.data().providerCallId);
+    if(!callSnapshot.data().providerCallId && !callSnapshot.data().agentCallId) throw new HttpsError('failed-precondition','The browser call has not connected to the phone service.');
+    result = await provider.end(callSnapshot.data().providerCallId || callSnapshot.data().agentCallId);
   } else if (action === 'hold_call' || action === 'resume_call') {
     callRef = db.doc(`tenants/${tenantId}/callRecords/${callSid}`);
     const callSnapshot = await callRef.get();
@@ -956,6 +1010,12 @@ function phoneWebhook(providerName, secrets) {
     if(!valid) return response.status(403).send('Invalid signature');
     const event=normalizeEvent(providerName,request.body || {},rawBody);
     if(!event.callId) return response.status(400).send('Missing call identifier');
+    if(providerName==='telnyx' && event.legRole==='agent') {
+      try {
+        await require('./telephony/agent-leg.cjs').handleAgentLeg({db,event,connectionId:process.env.TELNYX_CONNECTION_ID,provider:phoneProvider(),callbackUrl:process.env.TELEPHONY_STATUS_URL,enabled:process.env.TELEPHONY_ENABLED==='true'});
+        return response.status(200).send('Accepted');
+      } catch {return response.status(503).send('Agent call event requires reconciliation');}
+    }
     const snapshots=await db.collectionGroup('callRecords').where('provider','==',providerName).where('providerCallId','==',event.callId).limit(2).get();
     let matches=snapshots.docs, consultation=false;
     if(!matches.length && providerName==='telnyx' && event.gmsCallId && event.tenantId && !event.gmsCallId.includes('/') && !event.tenantId.includes('/')) {
@@ -967,16 +1027,35 @@ function phoneWebhook(providerName, secrets) {
     if(!matches.length) { const other=await db.collectionGroup('callRecords').where('provider','==',providerName).where('consultationCallId','==',event.callId).limit(2).get(); matches=other.docs; consultation=true; }
     if(matches.length!==1) return response.status(202).send('No uniquely mapped call');
     const ref=matches[0].ref;
+    const callBinding=(await db.doc(`gmsCallBindings/${ref.id}`).get()).data();
+    if(!callBinding || callBinding.callPath!==ref.path || event.connectionId!==process.env.TELNYX_CONNECTION_ID ||
+      event.tenantId!==callBinding.tenantId || event.gmsCallId!==ref.id || event.legRole!=='lead' ||
+      normalizedPhone(event.from)!==normalizedPhone(callBinding.from) || normalizedPhone(event.to)!==normalizedPhone(callBinding.destination)) return response.status(202).send('Call ownership did not match');
     await db.runTransaction(async tx=>{
       const eventRef=ref.collection('providerEvents').doc(event.id);
-      const [seen,current]=await Promise.all([tx.get(eventRef),tx.get(ref)]);
+      const bindingRef=db.doc(`gmsCallBindings/${ref.id}`);
+      const [seen,current,freshBinding]=await Promise.all([tx.get(eventRef),tx.get(ref),tx.get(bindingRef)]);
       if(seen.exists) return;
       if(!consultation && current.data().providerCallId && current.data().providerCallId!==event.callId) throw new Error('Conflicting provider call binding');
+      if(!consultation && freshBinding.data()?.providerCallId && freshBinding.data().providerCallId!==event.callId) throw new Error('Conflicting trusted provider call binding');
       const patch={updatedAt:FieldValue.serverTimestamp()};
+      let archiveJob=null, archiveJobRef=null;
       if(!consultation && !current.data().providerCallId && event.callId) patch.providerCallId=event.callId;
       if(consultation) { if(event.answered) patch.consultationStatus='answered'; else if(event.status==='completed') patch.consultationStatus='completed'; }
       else if(statusCanAdvance(current.data().status,event.status)) patch.status=event.status;
-      if(event.recordingUrl && require('./telephony/readiness.cjs').recordingAllowed(current.data())) { patch.recordingUrl=event.recordingUrl; patch.recordingStatus='saved'; }
+      if(event.eventType==='call.recording.saved' && event.recordingId && require('./telephony/readiness.cjs').recordingAllowed(callBinding)) {
+        const recordingId=require('./telephony/recording-archive.cjs').recordingIdentity(event.recordingId);
+        // Root-level server-owned jobs contain no media URL or provider secret.
+        // The archive worker retrieves provider metadata and checks call ownership.
+        archiveJobRef=db.doc(`gmsRecordingArchiveJobs/${recordingId}`);
+        const existingArchive=await tx.get(archiveJobRef);
+        if(existingArchive.exists && existingArchive.data().callPath!==ref.path) throw new Error('Conflicting recording ownership');
+        if(!existingArchive.exists) archiveJob={
+          recordingId, callPath:ref.path, tenantId:current.data().tenantId,
+          status:'pending', createdAt:FieldValue.serverTimestamp(),
+        };
+        if(archiveJob) patch.recordingStatus='archive_pending';
+      }
       if(!consultation && event.status==='completed') patch.endedAt=FieldValue.serverTimestamp();
       if(!consultation && ['completed','failed','busy','no-answer','canceled'].includes(event.status) && current.data().leadId) {
         const leadRef=db.doc(`tenants/${current.data().tenantId}/leads/${current.data().leadId}`);
@@ -984,6 +1063,8 @@ function phoneWebhook(providerName, secrets) {
         if(lead.exists && lead.data().activeCallId===ref.id) tx.update(leadRef,{activeCallId:null,callStartPending:false});
       }
       tx.create(eventRef,{provider:providerName,eventType:event.eventType || 'unknown',receivedAt:FieldValue.serverTimestamp()});
+      if(!consultation && event.callId && !freshBinding.data()?.providerCallId) tx.update(bindingRef,{providerCallId:event.callId});
+      if(archiveJob) tx.create(archiveJobRef,archiveJob);
       tx.update(ref,patch);
     });
     // Only a signed answered event can trigger recording. Browser state and
@@ -991,12 +1072,18 @@ function phoneWebhook(providerName, secrets) {
     if(providerName==='telnyx' && event.answered && !consultation && process.env.TELEPHONY_ENABLED==='true') {
       const shouldRecord=await db.runTransaction(async tx=>{
         const current=await tx.get(ref), call=current.data();
-        if(!call || call.providerCallId!==event.callId || call.status!=='in_progress' || call.recordingStatus || !require('./telephony/readiness.cjs').recordingAllowed(call)) return false;
+        if(!call || call.providerCallId!==event.callId || call.status!=='in_progress' || call.recordingStatus || !require('./telephony/readiness.cjs').recordingAllowed(callBinding)) return false;
         tx.update(ref,{recordingStatus:'starting'}); return true;
       });
       if(shouldRecord) {
         try { await phoneProvider().record(event.callId,true); await ref.update({recordingStatus:'recording'}); }
         catch { await ref.update({recordingStatus:'failed'}); }
+      }
+    }
+    if(event.status==='completed' && !consultation) {
+      const ended=(await ref.get()).data();
+      if(ended?.agentCallId) {
+        try {await phoneProvider().end(ended.agentCallId);} catch(error) {if(error.providerStatus!==404 && error.providerStatus!==422) throw error;}
       }
     }
     return response.status(200).send('Accepted');

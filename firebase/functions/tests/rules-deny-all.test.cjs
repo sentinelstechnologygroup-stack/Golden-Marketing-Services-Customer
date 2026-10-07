@@ -30,6 +30,18 @@ test.before(async () => {
 test.after(async () => {
   await env.cleanup();
 });
+test('client administrators cannot fabricate Telnyx evidence or access private recording objects directly',async()=>{
+ await env.withSecurityRulesDisabled(async context=>{
+  await setDoc(doc(context.firestore(),'tenants/evidence-tenant/members/evidence-client'),{active:true,role:'client_admin'});
+  await setDoc(doc(context.firestore(),'tenants/evidence-tenant/callRecords/provider-call'),{tenantId:'evidence-tenant',provider:'telnyx',status:'completed'});
+ });
+ const context=env.authenticatedContext('evidence-client'),db=context.firestore();
+ await assertFails(setDoc(doc(db,'tenants/evidence-tenant/callRecords/spoofed'),{tenantId:'evidence-tenant',provider:'telnyx',status:'completed'}));
+ await assertFails(setDoc(doc(db,'tenants/evidence-tenant/callRecords/provider-call'),{tenantId:'evidence-tenant',provider:'manual',status:'completed'}));
+ await assertFails(setDoc(doc(db,'tenants/evidence-tenant/callQualityReviews/spoofed'),{tenantId:'evidence-tenant',aiGenerated:true,score:100}));
+ await assertSucceeds(setDoc(doc(db,'tenants/evidence-tenant/callQualityReviews/human-review'),{tenantId:'evidence-tenant',aiGenerated:false,score:80}));
+ await assertFails(uploadBytes(ref(context.storage(),'private-call-evidence/evidence-tenant/provider-call/recording.wav'),new Uint8Array([1,2,3]),{contentType:'audio/wav'}));
+});
 
 test('Firestore denies unauthenticated access', async () => {
   const db = env.unauthenticatedContext().firestore();

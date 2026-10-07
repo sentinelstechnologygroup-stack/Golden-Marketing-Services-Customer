@@ -2,7 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const {configurationIssues, recordingAllowed, selectOutboundNumber} = require('../telephony/readiness.cjs');
 const {createProvider} = require('../telephony/providers.cjs');
-const valid = {TELEPHONY_PROVIDER:'telnyx', TELNYX_CONNECTION_ID:'connection', TELNYX_PUBLIC_KEY:Buffer.alloc(32).toString('base64'), TELNYX_STATUS_WEBHOOK_URL:'https://example.com/webhook', TELEPHONY_STATUS_URL:'https://example.com/webhook', TELNYX_DIALING_RESTRICTIONS_VERIFIED:'true'};
+const valid = {TELEPHONY_PROVIDER:'telnyx', TELNYX_CONNECTION_ID:'connection', TELNYX_BROWSER_CONNECTION_ID:'receive-only-connection', TELNYX_PUBLIC_KEY:Buffer.alloc(32).toString('base64'), TELNYX_STATUS_WEBHOOK_URL:'https://example.com/webhook', TELEPHONY_STATUS_URL:'https://example.com/webhook', TELNYX_DIALING_RESTRICTIONS_VERIFIED:'true',GMS_RECORDING_PIPELINE_READY:'true'};
 test('activation rejects incomplete configuration even with the enable flag set', () => {
   assert.ok(configurationIssues({TELEPHONY_PROVIDER:'telnyx', TELEPHONY_ENABLED:'true'}).length);
   for (const key of Object.keys(valid).filter(key=>key!=='TELEPHONY_PROVIDER')) {

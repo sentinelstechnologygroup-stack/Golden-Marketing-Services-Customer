@@ -44,6 +44,6 @@ test('Telnyx can hold a direct browser call before any conference handoff',async
 });
 test('Telnyx browser tokens require a provisioned agent and never return the API key',async()=>{
  await assert.rejects(()=>browserSession('telnyx',{token:'private-api-key'},'agent',{}));
- const session=await browserSession('telnyx',{token:'private-api-key'},'agent',{telnyxCredentialId:'credential'},async(url,opts)=>{assert.match(url,/telephony_credentials\/credential\/token$/);assert.equal(opts.headers.Authorization,'Bearer private-api-key');return {ok:true,text:async()=>'short-lived-token'};});
+ const session=await browserSession('telnyx',{token:'private-api-key',browserConnectionId:'receive-only'},'agent',{telnyxCredentialId:'credential'},async(url,opts)=>{assert.equal(opts.headers.Authorization,'Bearer private-api-key');if(url.endsWith('/token')) return {ok:true,text:async()=>'short-lived-token'};return {ok:true,json:async()=>({data:url.includes('/credential_connections/')?{active:true,outbound:{outbound_voice_profile_id:null}}:{connection_id:'receive-only'}})};});
  assert.equal(session.token,'short-lived-token');assert.doesNotMatch(JSON.stringify(session),/private-api-key/);
 });

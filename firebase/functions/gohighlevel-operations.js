@@ -12,6 +12,10 @@ const db = getFirestore();
 // Match the existing invitation-only onboarding callable boundary. The current
 // portal has no App Check client; fresh identity and explicit authorization apply.
 const callable = { enforceAppCheck: false, maxInstances: 2, secrets: [integrationSecret], timeoutSeconds: 60 };
+async function tokenFor(connection, settings) {
+  if(connection.oauthSecretId) return require('./gohighlevel-oauth-store.cjs').locationToken(connection.locationId);
+  return settings.locationTokens?.[connection.locationId] || null;
+}
 
 function config() {
   try {
@@ -88,6 +92,62 @@ exports.getGoHighLevelConnection = onCall({ enforceAppCheck: false, maxInstances
     snapshotId: connection?.snapshotId || null, messagingEnabled: false };
 });
 
+exports.performGoHighLevelAction = onCall(callable, async request=>{
+  const {tenantId,leadId,action,commandId,input={}}=request.data || {};
+  const access=await authorize(request,tenantId);
+  try {identifier(leadId);identifier(commandId);} catch {throw new HttpsError('invalid-argument','Lead and unique operation identifiers are required.');}
+  const lead=(await db.doc(`tenants/${tenantId}/leads/${leadId}`).get()).data();
+  if(!lead || lead.tenantId!==tenantId) throw new HttpsError('not-found','Lead not found.');
+  if(!access.fullTenant) {
+    const brands=[access.assignment?.brandId,...(access.assignment?.brandIds || [])].filter(Boolean);
+    if(!brands.includes(lead.brandId) || lead.assignedTo!==access.uid) throw new HttpsError('permission-denied','Lead is outside your assignment.');
+    if(action==='update_contact') throw new HttpsError('permission-denied','Client administration is required to change contact identity.');
+  }
+  const {connection}=await mappedConnection(tenantId);
+  if(connection.status!=='connected') throw new HttpsError('failed-precondition','Verify the client connection first.');
+  const mapping=(await db.doc(`gmsProviderContacts/${tenantId}/leads/${leadId}`).get()).data();
+  if(!mapping?.contactId || mapping.locationId!==connection.locationId) throw new HttpsError('failed-precondition','Link the authorized lead to its client contact first.');
+  const token=await tokenFor(connection,config());
+  if(!token) throw new HttpsError('failed-precondition','Location credential is required.');
+  let operation;
+  try {operation=require('./gohighlevel-workflow-policy.cjs').workflowRequest(action,input,{contactId:mapping.contactId,locationId:connection.locationId});}
+  catch(error) {throw new HttpsError('invalid-argument',error.message);}
+  const contact=(await api(`/contacts/${identifier(mapping.contactId)}`,token)).contact;
+  if(contact?.id!==mapping.contactId || contact.locationId!==connection.locationId) throw new HttpsError('permission-denied','Contact ownership could not be verified.');
+  if(operation.verify) {
+    const {type,id}=operation.verify;
+    const payload=await api(type==='calendar'?`/calendars/${id}`:`/opportunities/${id}`,token);
+    const record=payload[type];
+    if(record?.locationId!==connection.locationId || (type==='opportunity' && record.contactId!==mapping.contactId)) throw new HttpsError('permission-denied','Resource is outside this client or lead.');
+  }
+  const crypto=require('node:crypto');
+  const fingerprint=crypto.createHash('sha256').update(JSON.stringify({actor:request.auth.uid,leadId,operation})).digest('hex');
+  const ref=db.doc(`gmsProviderOperations/${tenantId}/operations/${commandId}`);
+  const prior=await db.runTransaction(async tx=>{
+    const saved=await tx.get(ref);
+    if(saved.exists) {
+      if(saved.data().fingerprint!==fingerprint) throw new HttpsError('already-exists','Operation identifier was used for different changes.');
+      return saved.data();
+    }
+    tx.create(ref,{tenantId,leadId,actorUid:request.auth.uid,action,fingerprint,status:'in_flight',createdAt:FieldValue.serverTimestamp()});
+    return null;
+  });
+  if(prior?.status==='succeeded') return {ok:true,commandId,status:'succeeded',providerRecordId:prior.providerRecordId || null};
+  if(prior) throw new HttpsError('failed-precondition','This operation needs reconciliation before retrying.');
+  try {
+    const result=await api(operation.path,token,operation);
+    const providerRecordId=result.note?.id || result.task?.id || result.contact?.id || result.opportunity?.id || result.id || null;
+    const batch=db.batch();
+    batch.update(ref,{status:'succeeded',providerRecordId,completedAt:FieldValue.serverTimestamp()});
+    batch.create(db.collection(`tenants/${tenantId}/auditLogs`).doc(),{tenantId,brandId:lead.brandId,actorUid:request.auth.uid,action:`gohighlevel.${action}`,target:leadId,commandId,createdAt:FieldValue.serverTimestamp()});
+    await batch.commit();
+    return {ok:true,commandId,status:'succeeded',providerRecordId};
+  } catch(error) {
+    await ref.update({status:'needs_reconciliation',updatedAt:FieldValue.serverTimestamp()});
+    throw error;
+  }
+});
+
 exports.readGoHighLevelResource = onCall(callable, async (request) => {
   const { tenantId, resource } = request.data || {};
   const access = await authorize(request, tenantId);
@@ -114,7 +174,7 @@ exports.readGoHighLevelResource = onCall(callable, async (request) => {
   const settings = config();
   // Private location tokens are explicitly scoped per location. OAuth auto-install
   // and refresh are a separate connection mode, not assumed to work with an agency PIT.
-  const token = settings.locationTokens?.[connection.locationId];
+  const token = await tokenFor(connection, settings);
   if (!token) throw new HttpsError('failed-precondition', 'A location-scoped GoHighLevel credential is required.');
   let operation;
   try { operation = readRequest(resource, connection.locationId, request.data); }
@@ -145,7 +205,7 @@ exports.linkGoHighLevelContact = onCall(callable, async (request) => {
   catch { throw new HttpsError('invalid-argument', 'Invalid lead or contact.'); }
   const { connection, revision } = await mappedConnection(tenantId);
   if (connection.status !== 'connected') throw new HttpsError('failed-precondition', 'Verify the client connection first.');
-  const token = config().locationTokens?.[connection.locationId];
+  const token = await tokenFor(connection, config());
   if (!token) throw new HttpsError('failed-precondition', 'Location credential is required.');
   const payload = await api(`/contacts/${contactId}`, token);
   const leadRef = db.doc(`tenants/${tenantId}/leads/${leadId}`);
@@ -185,7 +245,9 @@ exports.connectExistingGoHighLevelLocation = onCall(callable, async (request) =>
   await authorize(request, tenantId, true);
   try { identifier(locationId); } catch { throw new HttpsError('invalid-argument', 'Invalid location.'); }
   const settings = config();
-  const token = settings.locationTokens?.[locationId] || settings.agencyToken;
+  const savedConnection=(await db.doc(`gmsProviderConnections/${tenantId}`).get()).data();
+  const token = savedConnection?.locationId===locationId && savedConnection.oauthSecretId
+    ? await tokenFor(savedConnection, settings) : settings.locationTokens?.[locationId] || settings.agencyToken;
   if (!token) throw new HttpsError('failed-precondition', 'This location needs its own API authorization.');
   const payload = await api(`/locations/${locationId}`, token);
   const location = payload.location || payload;
@@ -217,7 +279,7 @@ exports.verifyGoHighLevelConnection = onCall(callable, async (request) => {
   const { connection, data, revision } = await mappedConnection(tenantId);
   if (!connection?.locationId) throw new HttpsError('failed-precondition', 'Provision the tenant location first.');
   const settings = config();
-  const token = settings.locationTokens?.[connection.locationId];
+  const token = await tokenFor(connection, settings);
   if (!token) throw new HttpsError('failed-precondition', 'Location credential has not been configured.');
   const checks = await Promise.all(['conversations', 'calendars', 'opportunities'].map(async (resource) => {
     const operation = readRequest(resource, connection.locationId, { limit: 1 });

@@ -140,10 +140,11 @@ test('existing-route ingestion, Agent workflow, Customer projection, and Brand i
   Object.assign(process.env, {
     TELEPHONY_PROVIDER: 'telnyx', TELEPHONY_ENABLED: 'true',
     TELNYX_API_KEY: 'emulator-only-token', TELNYX_CONNECTION_ID: 'emulator-connection',
+    TELNYX_BROWSER_CONNECTION_ID: 'emulator-receive-only-browser',
     TELNYX_PUBLIC_KEY: Buffer.alloc(32).toString('base64'),
     TELNYX_STATUS_WEBHOOK_URL: 'https://example.test/webhook',
     TELEPHONY_STATUS_URL: 'https://example.test/webhook',
-    TELNYX_DIALING_RESTRICTIONS_VERIFIED: 'true', TELEPHONY_WARM_TRANSFER_ENABLED: 'false',
+    TELNYX_DIALING_RESTRICTIONS_VERIFIED: 'true', TELEPHONY_WARM_TRANSFER_ENABLED: 'false',GMS_RECORDING_PIPELINE_READY:'true',
   });
   await assert.rejects(
     functions.communications.run(agentRequest({

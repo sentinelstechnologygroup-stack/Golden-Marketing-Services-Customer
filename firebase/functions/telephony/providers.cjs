@@ -6,13 +6,14 @@ function required(config,keys){for(const key of keys)if(!String(config[key]||'')
 function createProvider(name,config,transport=fetch){
  selectedProvider(name);required(config,['token','connectionId']);
  async function request(path,values={},method='POST'){
-  const response=await transport('https://api.telnyx.com/v2'+path,{method,signal:AbortSignal.timeout(15000),headers:{Authorization:'Bearer '+config.token,'Content-Type':'application/json'},...(method==='GET'?{}:{body:JSON.stringify(values)})});
+  const response=await transport('https://api.telnyx.com/v2'+path,{method,redirect:'error',signal:AbortSignal.timeout(15000),headers:{Authorization:'Bearer '+config.token,'Content-Type':'application/json'},...(method==='GET'?{}:{body:JSON.stringify(values)})});
   const body=await response.json();if(!response.ok){const error=new Error('Phone service rejected the request.');error.providerStatus=response.status;throw error;}return body.data;
  }
  const callPath=id=>'/calls/'+encodeURIComponent(id)+'/actions';
  const conferencePath=id=>'/conferences/'+encodeURIComponent(id)+'/actions';
  return {name,
-  async start({to,from,callbackUrl,commandId}){required({from,callbackUrl},['from','callbackUrl']);const result=await request('/calls',{to,from,connection_id:config.connectionId,webhook_url:callbackUrl,command_id:commandId});return {id:result.call_control_id,status:result.status||'queued'};},
+  credential:id=>request('/telephony_credentials/'+encodeURIComponent(id),{},'GET'),
+  async start({to,from,callbackUrl,commandId,clientState,linkTo}){required({from,callbackUrl},['from','callbackUrl']);const result=await request('/calls',{to,from,connection_id:config.connectionId,webhook_url:callbackUrl,command_id:commandId,...(clientState?{client_state:clientState}:{}),...(linkTo?{link_to:linkTo,bridge_intent:true,bridge_on_answer:true,prevent_double_bridge:true}:{})});return {id:result.call_control_id,status:result.status||'queued'};},
   end:id=>request(callPath(id)+'/hangup'),
   holdCall:(id,hold)=>request(callPath(id)+(hold?'/hold':'/unhold')),
   answer:id=>request(callPath(id)+'/answer'),

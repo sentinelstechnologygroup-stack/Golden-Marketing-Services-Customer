@@ -57,6 +57,10 @@ service cloud.firestore {
     function configurationCollection(collection) {
       return collection in ['organizations', 'brands', 'campaigns', 'leadSources', 'scripts', 'qualificationForms', 'routingRules', 'phoneNumbers'];
     }
+    function clientWritableEvidence(collection, data) {
+      return !(collection == 'callRecords' && data.get('provider', '') == 'telnyx')
+        && !(collection in ['callTranscripts', 'callQualityReviews'] && (data.get('aiGenerated', false) == true || data.get('managedBy', '') == 'recording_worker'));
+    }
 
     match /tenants/{tenantId} {
       allow read: if canAccessTenant(tenantId);
@@ -80,6 +84,7 @@ service cloud.firestore {
           && (!agentAssigned(tenantId) || gmsSuperAdmin() || membership(tenantId) || agentBrandAllowed(tenantId))
           && (gmsSuperAdmin() || agentAssigned(tenantId) || (membership(tenantId) && (role(tenantId) in ['admin', 'supervisor', 'client_admin', 'client_supervisor', 'auditor'] || (role(tenantId) in ['customer', 'client'] && customerReadable(collection)))));
         allow create: if membership(tenantId)
+          && clientWritableEvidence(collection, request.resource.data)
           && collection != 'members'
           && collection != 'auditLogs'
           && tenantData(tenantId)
@@ -87,6 +92,8 @@ service cloud.firestore {
             || (role(tenantId) in ['admin', 'supervisor', 'client_admin', 'client_supervisor'] && configurationCollection(collection))
             || (role(tenantId) in ['admin', 'client_admin'] && collection in ['support', 'documents']));
         allow update: if membership(tenantId)
+          && clientWritableEvidence(collection, resource.data)
+          && clientWritableEvidence(collection, request.resource.data)
           && (!('managedBy' in resource.data) || resource.data.managedBy != 'onboarding')
           && collection != 'members'
           && collection != 'auditLogs'
@@ -96,6 +103,7 @@ service cloud.firestore {
             || (role(tenantId) in ['admin', 'supervisor', 'client_admin', 'client_supervisor'] && configurationCollection(collection))
             || (role(tenantId) in ['admin', 'client_admin'] && collection in ['support', 'documents']));
         allow delete: if membership(tenantId)
+          && clientWritableEvidence(collection, resource.data)
           && !(collection in ['config', 'integrations', 'campaignApprovals'])
           && (!('managedBy' in resource.data) || resource.data.managedBy != 'onboarding')
           && collection != 'members'

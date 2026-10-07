@@ -7,7 +7,10 @@ async function syncProfile(tenantId, settings, actorUid) {
   const [tenant, draft] = await Promise.all([root.get(), ref.get()]);
   const saved = draft.data(), locationId = saved?.data?.locationId;
   if (!tenant.exists || tenant.data().demo || tenant.data().environment !== 'production' || !locationId) return { status: 'not_linked' };
-  const token = settings.locationTokens?.[locationId];
+  const connection=(await db.doc(`gmsProviderConnections/${tenantId}`).get()).data();
+  const token = connection?.locationId===locationId && connection.oauthSecretId
+    ? await require('./gohighlevel-oauth-store.cjs').locationToken(locationId)
+    : settings.locationTokens?.[locationId];
   if (!token) return { status: 'authorization_required' };
   const owner = await db.doc(`ghlLocationTenants/${locationId}`).get();
   if (owner.data()?.tenantId !== tenantId) throw new Error('Location ownership mismatch.');

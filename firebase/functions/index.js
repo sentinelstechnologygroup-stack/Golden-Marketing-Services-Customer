@@ -6,3 +6,8 @@ Object.assign(exports, require('./website-ingestion'));
 Object.assign(exports, require('./platform-administration'));
 Object.assign(exports, require('./notification-delivery'));
 Object.assign(exports, require('./gohighlevel-operations'));
+Object.assign(exports, require('./gohighlevel-oauth'));
+Object.assign(exports, require('./messaging-bridge'));
+Object.assign(exports, require('./recording-evidence'));
+Object.assign(exports, require('./call-evidence-access'));
+Object.assign(exports, require('./recording-analysis'));
