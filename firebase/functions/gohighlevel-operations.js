@@ -16,7 +16,7 @@ const callable = { enforceAppCheck: false, maxInstances: 2, secrets: [integratio
 function config() {
   try {
     const value = JSON.parse(integrationSecret.value());
-    if (!value.companyId || !value.agencyToken) throw new Error();
+    if (!value.agencyToken && !Object.values(value.locationTokens || {}).some(token => typeof token === 'string' && token)) throw new Error();
     return value;
   } catch {
     throw new HttpsError('failed-precondition', 'GoHighLevel backend credentials are not configured.');
@@ -66,7 +66,7 @@ async function api(path, token, { method = 'GET', body } = {}) {
   try {
     response = await fetch(`https://services.leadconnectorhq.com${path}`, {
       method, redirect: 'error', signal: AbortSignal.timeout(20000),
-      headers: { Authorization: `Bearer ${token}`, Version: 'v3', Accept: 'application/json', 'Content-Type': 'application/json' },
+      headers: { Authorization: `Bearer ${token}`, Version: 'v3', Accept: 'application/json', 'Content-Type': 'application/json', 'User-Agent': 'GMS-CRM/1.0' },
       body: body ? JSON.stringify(body) : undefined,
     });
   } catch {
@@ -185,9 +185,11 @@ exports.connectExistingGoHighLevelLocation = onCall(callable, async (request) =>
   await authorize(request, tenantId, true);
   try { identifier(locationId); } catch { throw new HttpsError('invalid-argument', 'Invalid location.'); }
   const settings = config();
-  const payload = await api(`/locations/${locationId}`, settings.agencyToken);
+  const token = settings.locationTokens?.[locationId] || settings.agencyToken;
+  if (!token) throw new HttpsError('failed-precondition', 'This location needs its own API authorization.');
+  const payload = await api(`/locations/${locationId}`, token);
   const location = payload.location || payload;
-  if (location.id !== locationId || location.companyId !== settings.companyId) throw new HttpsError('permission-denied', 'Sub-account does not belong to the configured agency.');
+  if (location.id !== locationId || (settings.companyId && location.companyId !== settings.companyId)) throw new HttpsError('permission-denied', 'Sub-account does not belong to the configured agency.');
   const tenantRef = db.doc(`tenants/${tenantId}`);
   const connectionRef = db.doc(`gmsProviderConnections/${tenantId}`);
   const ownerRef = db.doc(`ghlLocationTenants/${locationId}`);
@@ -198,7 +200,7 @@ exports.connectExistingGoHighLevelLocation = onCall(callable, async (request) =>
     if (onboarding.data()?.data?.locationId !== locationId || owner.data()?.tenantId !== tenantId) throw new HttpsError('failed-precondition', 'Save this location in the client onboarding form first.');
     if (owner.exists && owner.data().tenantId !== tenantId) throw new HttpsError('already-exists', 'Sub-account is already owned by another GMS tenant.');
     const now = FieldValue.serverTimestamp();
-    transaction.set(connectionRef, { tenantId, provider: 'GoHighLevel', companyId: settings.companyId, locationId,
+    transaction.set(connectionRef, { tenantId, provider: 'GoHighLevel', companyId: location.companyId, locationId,
       status: 'awaiting_location_credential', actorUid: request.auth.uid, updatedAt: now }, { merge: true });
     transaction.set(ownerRef, { tenantId, locationId, updatedAt: now });
     transaction.update(tenantRef, { ghlLocationId: locationId, updatedAt: now });

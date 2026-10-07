@@ -5,6 +5,9 @@ const { getStorage } = require('firebase-admin/storage');
 const { onCall, HttpsError } = require('firebase-functions/v2/https');
 const policy = require('./client-onboarding-policy.cjs');
 const db = getFirestore();
+const { defineSecret } = require('firebase-functions/params');
+const profileSecret = defineSecret('GMS_GOHIGHLEVEL_CONFIG');
+const { syncProfile } = require('./gohighlevel-profile-sync.cjs');
 const options = { enforceAppCheck: false, maxInstances: 2, timeoutSeconds: 60 };
 // These narrowly-scoped callables use fresh Auth records plus server-side role
 // checks; the Agent client does not yet support App Check. No generic writes.
@@ -73,10 +76,17 @@ exports.listGmsClients = onCall(options, async request => {
   const agents = users.filter(u => !u.disabled).map(u => ({uid:u.uid,name:u.displayName || u.email || u.uid}));
   return { clients: clients.sort((a, b) => a.name.localeCompare(b.name)), agents, truncated: tenants.size === 200 };
 });
-exports.getGmsClient = onCall(options, async request => {
+exports.getGmsClient = onCall({ ...options, secrets: [profileSecret] }, async request => {
   const tenantId = identifier(request.data?.clientId);
   const reader = await access(request, tenantId, false);
-  return workspace(tenantId, reader);
+  let sync;
+  if (reader.admin) {
+    let settings = {};
+    try { settings = JSON.parse(profileSecret.value()); } catch { /* Missing authorization remains explicit. */ }
+    try { sync = await syncProfile(tenantId, settings, reader.user.uid); }
+    catch { sync = { status: 'sync_failed', message: 'GoHighLevel profile could not be refreshed. Saved details retained.' }; }
+  }
+  return { ...await workspace(tenantId, reader), ...(sync ? { profileSync: sync } : {}) };
 });
 exports.saveGmsClient = onCall(options, async request => {
   const caller = await identity(request);

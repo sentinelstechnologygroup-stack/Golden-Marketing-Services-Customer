@@ -1,4 +1,23 @@
-# GMS Telnyx activation setup — 2026-10-03
+# GMS Telnyx activation setup — updated 2026-10-06
+
+## Current account and purchased numbers
+
+The current account is admin@sentinelstechnologygroup.com, organization Sentinels Technology Group, confirmed Verified. The previous resources described below belong to the earlier account and must not be reused as current connection IDs or verification keys. The new account was observed without SIP connections or Voice API applications before this setup resumed.
+
+All four numbers were confirmed Active in the new account on 2026-10-06, with no calling connection or messaging profile assigned:
+
+| Number | Intended assignment | Telnyx number ID |
+| --- | --- | --- |
+| +19362499427 | Golden Cross Realty agent outbound campaigns | 3065097412952458363 |
+| +18328494467 | GMS local business line | 3065097412927292537 |
+| +18337754467 | GMS toll-free sales/support | 3065097412935681146 |
+| +19792465336 | GMS additional number; purpose pending | 3065097412960846972 |
+
+These are verified provider inventory records, not completed CRM assignments. Resolve the intended GCR tenant/brand/campaign before writing production number assignments. Return-call destinations remain pending.
+
+The user approved persistent access. GMS Production WebRTC was created with credential connection ID 3065099933334898003. Its API v2 webhook URL was confirmed through the Telnyx API. No outbound voice profile is assigned yet; Telnyx explicitly reports outbound calling is disabled. A dedicated API key was created and the user stored it in GMS Secret Manager TELNYX_API_KEY version 2. Version 2 authenticated successfully against this connection without revealing the key. Backend configuration updates are in progress; live calling, warm transfer and dialing-restrictions verification remain disabled. The new account public verification key has been obtained; deployment completion and signed-event testing are still required.
+
+## Historical setup in the earlier account
 
 Calling remains disabled. Resource creation and account verification are recorded separately from calling readiness.
 

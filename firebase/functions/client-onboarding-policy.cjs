@@ -8,7 +8,7 @@ function id(value) {
 function normalize(input = {}) {
   const data = {
     name: text(input.name, 200), legalName: text(input.legalName, 200),
-    adminEmail: text(input.adminEmail, 254).toLowerCase(), phone: text(input.phone, 30),
+    adminEmail: text(input.adminEmail, 254).toLowerCase(), businessEmail: text(input.businessEmail, 254), phone: text(input.phone, 30),
     domain: text(input.domain, 300), address: text(input.address, 500), industry: text(input.industry, 100),
     timezone: text(input.timezone, 80) || 'America/Chicago', brandName: text(input.brandName, 200),
     locationId: text(input.locationId, 100), phoneNumber: text(input.phoneNumber, 30),
