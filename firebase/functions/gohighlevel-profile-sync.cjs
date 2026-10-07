@@ -1,5 +1,6 @@
 const { getFirestore, FieldValue } = require('firebase-admin/firestore');
 const { mergeProfile } = require('./gohighlevel-profile-policy.cjs');
+const { isDeepStrictEqual } = require('node:util');
 async function syncProfile(tenantId, settings, actorUid) {
   const db = getFirestore();
   const root = db.doc(`tenants/${tenantId}`), ref = root.collection('config').doc('onboarding');
@@ -18,7 +19,7 @@ async function syncProfile(tenantId, settings, actorUid) {
   const payload = await response.json(), location = payload.location;
   if (settings.companyId && location?.companyId !== settings.companyId) throw new Error('GoHighLevel agency mismatch.');
   const data = mergeProfile(saved.data, location, locationId);
-  const changed = JSON.stringify(data) !== JSON.stringify(saved.data);
+  const changed = !isDeepStrictEqual(data, saved.data);
   await db.runTransaction(async tx => {
     const [fresh, mapped, freshTenant] = await Promise.all([tx.get(ref), tx.get(db.doc(`ghlLocationTenants/${locationId}`)), tx.get(root)]);
     if (fresh.data()?.revision !== saved.revision || fresh.data()?.data?.locationId !== locationId || mapped.data()?.tenantId !== tenantId
