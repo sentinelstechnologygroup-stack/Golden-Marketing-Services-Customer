@@ -84,6 +84,7 @@ async function notifyTenant({ tenantId, brandId, assignedTo, clientContactUid, t
 }
 
 async function chooseAssignment(route, leadId) {
+  if (route.assignmentMode === 'shared_inbox') return null;
   let candidates = Array.isArray(route.assignedAgentUids) ? route.assignedAgentUids.filter(Boolean) : [];
   if (!candidates.length) {
     const snapshot = await db.collection('agentAssignments').where('tenantId', '==', route.tenantId).where('status', '==', 'active').get();
@@ -124,6 +125,7 @@ exports.ingestWebsiteLead = onRequest({ cors: false, secrets: [ingestionKey], ti
   const routeSnapshot = await db.doc(`ingestionRoutes/${routeKey}`).get();
   if (!routeSnapshot.exists || routeSnapshot.data().status !== 'active') return response.status(404).json({ error: 'Route not found' });
   const route = routeSnapshot.data();
+  if (route.testOnly === true && request.body?.isTest !== true) return response.status(400).json({ error: 'This intake route accepts labeled test submissions only' });
   const [tenant, brand] = await Promise.all([
     db.doc(`tenants/${route.tenantId}`).get(),
     db.doc(`tenants/${route.tenantId}/brands/${route.brandId}`).get(),

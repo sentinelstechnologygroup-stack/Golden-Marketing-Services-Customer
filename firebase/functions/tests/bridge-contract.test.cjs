@@ -9,6 +9,22 @@ const route = {
   consentPolicyId: 'consent-standard', retentionPolicyId: 'retention-standard',
 };
 
+test('verification is pending even when a submission claims verified contacts', () => {
+  const lead = canonicalLead(route, { email:'test@example.test', contactVerification:{ email:{status:'verified'}, sms:{status:'verified'} } });
+  assert.equal(lead.contactVerification.email.status, 'pending');
+  assert.equal(lead.contactVerification.sms.status, 'pending');
+  assert.equal(lead.contactVerification.sms.dispatchStatus, 'not_requested');
+});
+
+test('two-step enrichment is retained without delaying contact capture', () => {
+  const captured = canonicalLead(route, {phone:'+12532226355'});
+  assert.equal(captured.funnelProfile.completionStatus, 'contact_captured');
+  const enriched = canonicalLead(route, {funnelProfile:{area:'Conroe',budgetRange:'Under $400K',completionStatus:'completed',unknown:'discard'}});
+  assert.equal(enriched.funnelProfile.area, 'Conroe');
+  assert.equal(enriched.funnelProfile.completionStatus, 'completed');
+  assert.equal(enriched.funnelProfile.unknown, undefined);
+});
+
 test('canonical lead ownership comes only from the server route', () => {
   const lead = canonicalLead(route, {
     name: 'Golden Cross Pilot', email: 'pilot@example.test', tenantId: 'tenant-attacker',

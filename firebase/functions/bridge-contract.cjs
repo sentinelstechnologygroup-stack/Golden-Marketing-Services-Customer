@@ -68,6 +68,19 @@ function canonicalLead(route, payload, assignedTo = null, clientContact = null) 
     priority: route.defaultPriority || 'normal',
     customerVisible: true,
     isTest: payload.isTest === true,
+    contactVerification: {
+      email: { status: 'pending', dispatchStatus: 'not_requested' },
+      sms: { status: 'pending', dispatchStatus: 'not_requested' },
+    },
+    funnelProfile: {
+      area: text(payload.funnelProfile?.area, 200),
+      budgetRange: text(payload.funnelProfile?.budgetRange, 100),
+      timeline: text(payload.funnelProfile?.timeline, 100),
+      propertyType: text(payload.funnelProfile?.propertyType, 100),
+      workingWithAgent: text(payload.funnelProfile?.workingWithAgent, 30),
+      financingStatus: text(payload.funnelProfile?.financingStatus, 100),
+      completionStatus: payload.funnelProfile?.completionStatus === 'completed' ? 'completed' : 'contact_captured',
+    },
   };
 }
 
