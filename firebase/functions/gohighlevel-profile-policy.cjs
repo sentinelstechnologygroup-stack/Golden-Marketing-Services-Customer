@@ -4,7 +4,9 @@ function mergeProfile(current, location, locationId) {
   const patch = {};
   const copy = (field, value) => { if (typeof value === 'string' && value.trim()) patch[field] = value.trim(); };
   copy('name', location.name);
-  copy('legalName', location.business?.name);
+  // The provider's business.name can mirror its friendly name even while the
+  // legal-name UI is blank. Only an explicit legal-name field is authoritative.
+  copy('legalName', location.business?.legalName || location.legalName);
   copy('phone', location.phone);
   copy('domain', location.website);
   copy('timezone', location.timezone);
