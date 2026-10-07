@@ -1,13 +1,24 @@
 const crypto = require('node:crypto');
 const SCOPES = Object.freeze(['locations.readonly','contacts.readonly','contacts.write','opportunities.readonly','opportunities.write','calendars.readonly','calendars/events.readonly','calendars/events.write','conversations.readonly','conversations.write','conversations/message.readonly','conversations/message.write','workflows.readonly']);
+// GHL adds these protocol permissions to a converted Location token. They do
+// not add CRM workflows; accept only the documented pair, never arbitrary extras.
+const OAUTH_PROTOCOL_SCOPES=Object.freeze(['oauth.readonly','oauth.write']);
 function stateHash(state) {
   if(typeof state!=='string' || !/^[A-Za-z0-9_-]{43}$/.test(state)) throw new Error('Invalid authorization state.');
   return crypto.createHash('sha256').update(state).digest('hex');
 }
 function verifiedToken(value,expected,now=Date.now()) {
   if(!value || value.userType!=='Location' || value.locationId!==expected.locationId || value.companyId!==expected.companyId || value.token_type!=='Bearer') throw new Error('Authorization ownership mismatch.');
-  const scopes=new Set(String(value.scope || '').split(/\s+/).filter(Boolean));
-  if(SCOPES.some(scope=>!scopes.has(scope)) || [...scopes].some(scope=>!SCOPES.includes(scope))) throw new Error('Authorization scope mismatch.');
+  const scopeValues=Array.isArray(value.scope)?value.scope:typeof value.scope==='string'?value.scope.split(/\s+/).filter(Boolean):[];
+  const scopes=new Set(scopeValues);
+  const missingScopes=SCOPES.filter(scope=>!scopes.has(scope));
+  const unexpectedScopes=[...scopes].filter(scope=>typeof scope!=='string' || !(SCOPES.includes(scope) || OAUTH_PROTOCOL_SCOPES.includes(scope)));
+  const partialProtocolScopes=OAUTH_PROTOCOL_SCOPES.some(scope=>scopes.has(scope)) && !OAUTH_PROTOCOL_SCOPES.every(scope=>scopes.has(scope));
+  if(missingScopes.length || unexpectedScopes.length || partialProtocolScopes) {
+    const error=new Error('Authorization scope mismatch.');
+    error.scopeDiagnostic={missingScopes,unexpectedScopes:unexpectedScopes.filter(scope=>typeof scope==='string' && /^[a-zA-Z0-9_/.:-]{1,100}$/.test(scope)),format:Array.isArray(value.scope)?'array':typeof value.scope};
+    throw error;
+  }
   if(typeof value.access_token!=='string' || value.access_token.length<20 || typeof value.refresh_token!=='string' || value.refresh_token.length<20 || !Number.isFinite(value.expires_in) || value.expires_in<300 || value.expires_in>172800) throw new Error('Invalid authorization response.');
   return {accessToken:value.access_token,refreshToken:value.refresh_token,locationId:value.locationId,companyId:value.companyId,scopes:[...scopes].sort(),expiresAtMs:now+value.expires_in*1000,rotatedAtMs:now};
 }

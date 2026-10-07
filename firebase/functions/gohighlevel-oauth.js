@@ -59,7 +59,7 @@ exports.beginGmsCrmAuthorization=onCall({...options,enforceAppCheck:true},async 
 exports.gmsCrmOAuthCallback=onRequest(options,async(request,response)=>{
   response.set('Cache-Control','no-store').set('Referrer-Policy','no-referrer').set('X-Content-Type-Options','nosniff');
   if(request.method!=='GET') return response.status(405).send('Method not allowed.');
-  let stateRef,state,stage='state_validation';
+  let stateRef,state,stage='state_validation',grantMetadata;
   try {
     stateRef=db.doc(`gmsOAuthStates/${stateHash(request.query.state)}`);
     const code=request.query.code;
@@ -76,6 +76,7 @@ exports.gmsCrmOAuthCallback=onRequest(options,async(request,response)=>{
     await owner(state.tenantId,state.locationId);
     stage='agency_exchange';
     const grant=await exchange({grant_type:'authorization_code',code},'Company');
+    grantMetadata={userType:typeof grant.userType==='string'?grant.userType:'missing',companyId:typeof grant.companyId==='string'?grant.companyId:'missing',scopes:String(grant.scope || '').split(/\s+/).filter(Boolean),expiresIn:typeof grant.expires_in==='number'?grant.expires_in:null,installToFutureLocations:grant.installToFutureLocations===true};
     stage='location_conversion';
     const value=await resolveAuthorization(grant,state,{deriveLocation,readProfile});
     stage='ownership_revalidation';
@@ -91,7 +92,9 @@ exports.gmsCrmOAuthCallback=onRequest(options,async(request,response)=>{
     // Persist only fixed stage and numeric HTTP status, never provider bodies,
     // error messages, codes, state values or credential-bearing objects.
     const httpStatus=Number(/\((\d{3})\)/.exec(error?.message || '')?.[1]) || null;
-    if(state) await stateRef.set({status:'needs_reconciliation',failureStage:stage,failureHttpStatus:httpStatus,failedAt:FieldValue.serverTimestamp()},{merge:true}).catch(()=>{});
+    const reasons={'Authorization agency mismatch.':'agency_mismatch','Authorization scope mismatch.':'scope_mismatch','Invalid authorization response.':'invalid_token_response','Authorization ownership mismatch.':'location_mismatch','Authorization profile mismatch.':'profile_mismatch'};
+    const reason=reasons[error?.message] || 'operation_failed';
+    if(state) await stateRef.set({status:'needs_reconciliation',failureStage:stage,failureReason:reason,failureHttpStatus:httpStatus,...(grantMetadata?{grantMetadata}:{}),...(error?.scopeDiagnostic?{scopeDiagnostic:error.scopeDiagnostic}:{}),failedAt:FieldValue.serverTimestamp()},{merge:true}).catch(()=>{});
     console.warn('gms_oauth_callback_failed',{stage,httpStatus});
     return response.status(400).send('GMS authorization could not be completed. Return to the Agent Portal and request a new authorization.');
   }

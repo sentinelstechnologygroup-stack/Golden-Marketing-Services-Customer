@@ -14,14 +14,29 @@ it requested and accepted only Location tokens, whereas agency installation
 returns a Company token that must be converted for the selected location.
 
 The corrected callback requests the Company grant, validates agency ownership
-and the exact approved scopes, derives only the state-bound GCR location token,
+and the approved workflow scopes, derives only the state-bound GCR location token,
 and verifies its authenticated profile and company before storage. The transient
 agency grant is never persisted; only the verified Location token and its refresh
 token enter the existing per-location GMS secret. Existing Location refresh logic
 and all calling/messaging gates remain unchanged. Fixed failure-stage names and
 numeric HTTP statuses provide diagnostics without logging credential values or
-provider bodies. Six focused policy tests pass. Successful live reauthorization
-and actual token refresh still require verification; the old code is not replayed.
+provider bodies. Subsequent safe diagnostics confirmed the Company grant had
+the exact thirteen approved scopes, but the converted Location token also had
+GHL's documented `oauth.readonly` and `oauth.write` protocol permissions. The
+policy now accepts only that complete pair in addition to every required CRM
+scope; unrelated additions, missing CRM permissions and partial protocol pairs
+still fail closed. Permission arrays are normalized with the same checks.
+Fifteen focused OAuth/connector tests and lint pass. Live reauthorization succeeded
+on October 7: only location `1nMOAalgP22erJpYc5dv` was selected, its verified
+Location credential was stored in per-location Secret Manager version 1, and
+profile, contacts, calendars, conversations, pipelines and workflows returned
+HTTP 200 using that OAuth credential. A controlled real Location refresh then
+passed, replaced the refresh token, saved/read back version 2, updated connection
+metadata and passed the authenticated profile identity check. Callback revision
+`gmscrmoauthcallback-00005-vod` and refresh worker revision
+`refreshgmscrmauthorizations-00002-riw` are ACTIVE. The hourly scheduler remains
+configured; its future automatic renewal still needs operational observation.
+No communications gates were enabled and no SMS or call was sent.
 
 ## Ownership and approved scope
 

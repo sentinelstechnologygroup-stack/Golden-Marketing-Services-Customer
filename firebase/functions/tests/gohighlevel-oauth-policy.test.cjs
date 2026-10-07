@@ -41,6 +41,22 @@ test('OAuth state is unpredictable, bounded and hashed before persistence',()=>{
   assert.equal(stateHash(state).length,64); assert.notEqual(stateHash(state),state);
   for(const value of ['', 'x'.repeat(42), '../'+'x'.repeat(40)]) assert.throws(()=>stateHash(value));
 });
+
+test('scope arrays retain exact permission validation and safe mismatch diagnostics',()=>{
+  assert.deepEqual(verifiedToken({...response,scope:[...SCOPES]},expected).scopes,[...SCOPES].sort());
+  for(const scope of [[...SCOPES,'users.write'],SCOPES.slice(1),[...SCOPES,{}],null]) assert.throws(()=>verifiedToken({...response,scope},expected));
+  assert.throws(()=>verifiedToken({...response,scope:SCOPES.slice(1).join(' ')+' users.write'},expected),error=>{
+    assert.deepEqual(error.scopeDiagnostic.missingScopes,['locations.readonly']);
+    assert.deepEqual(error.scopeDiagnostic.unexpectedScopes,['users.write']);
+    assert.ok(!JSON.stringify(error.scopeDiagnostic).includes(response.access_token)); return true;
+  });
+});
+
+test('documented OAuth protocol pair does not allow other permissions or missing CRM scopes',()=>{
+  const scope=response.scope+' oauth.readonly oauth.write';
+  assert.equal(verifiedToken({...response,scope},expected).scopes.length,15);
+  for(const invalid of [scope+' users.write',scope.replace('contacts.write',''),response.scope+' oauth.write',response.scope+' oauth.readonly']) assert.throws(()=>verifiedToken({...response,scope:invalid},expected));
+});
 test('installation destinations cannot disclose state or client metadata to another host',()=>{
   const state=require('node:crypto').randomBytes(32).toString('base64url'),client={clientId:'public-client',redirectUri:'https://gms.example/callback'};
   const url=new URL(installUrl('https://marketplace.gohighlevel.com/oauth/chooselocation',client,state));
