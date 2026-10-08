@@ -14,7 +14,15 @@ function createProvider(name,config,transport=fetch){
  return {name,
   async credential(id){const data=await request('/telephony_credentials/'+encodeURIComponent(id),{},'GET');return {...data,connection_id:require('./credential-identity.cjs').connectionId(data)};},
   async start({to,from,callbackUrl,commandId,clientState,linkTo}){required({from,callbackUrl},['from','callbackUrl']);const result=await request('/calls',{to,from,connection_id:config.connectionId,webhook_url:callbackUrl,command_id:commandId,...(clientState?{client_state:clientState}:{}),...(linkTo?{link_to:linkTo,bridge_intent:true,bridge_on_answer:true,prevent_double_bridge:true}:{})});return {id:result.call_control_id,status:result.status||'queued'};},
-  end:id=>request(callPath(id)+'/hangup'),
+  async end(id) {
+    try { return await request(callPath(id)+'/hangup'); }
+    catch (error) {
+      if (error.providerStatus !== 422) throw error;
+      const state = await request('/calls/'+encodeURIComponent(id),{},'GET');
+      if (state?.is_alive === false) return {status:'completed'};
+      throw error;
+    }
+  },
   holdCall:(id,hold)=>request(callPath(id)+(hold?'/hold':'/unhold')),
   answer:id=>request(callPath(id)+'/answer'),
   conference:(id,name)=>request('/conferences',{call_control_id:id,name}),
