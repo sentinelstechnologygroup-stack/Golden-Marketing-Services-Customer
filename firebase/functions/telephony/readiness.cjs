@@ -18,7 +18,8 @@ function configurationIssues(env) {
     // Set only after provider-side dialing restrictions have been verified.
     // A server-selected dial instruction cannot restrict a browser SDK token.
     if (env.TELNYX_DIALING_RESTRICTIONS_VERIFIED !== 'true') issues.push('TELNYX_DIALING_RESTRICTIONS_VERIFIED');
-    if((env.DEFAULT_RECORDING_POLICY || 'record_on_consent')!=='do_not_record' && env.GMS_RECORDING_PIPELINE_READY!=='true') issues.push('GMS_RECORDING_PIPELINE_READY');
+    if(env.TELEPHONY_TEST_ONLY==='true' && env.TELEPHONY_TEST_RECORDING_POLICY!=='do_not_record') issues.push('TELEPHONY_TEST_RECORDING_POLICY');
+    if(!(env.TELEPHONY_TEST_ONLY==='true' && env.TELEPHONY_TEST_RECORDING_POLICY==='do_not_record') && (env.DEFAULT_RECORDING_POLICY || 'record_on_consent')!=='do_not_record' && env.GMS_RECORDING_PIPELINE_READY!=='true') issues.push('GMS_RECORDING_PIPELINE_READY');
   }
   if (!['do_not_record', 'record_on_consent', 'record_all'].includes(env.DEFAULT_RECORDING_POLICY || 'record_on_consent')) issues.push('DEFAULT_RECORDING_POLICY');
   return [...new Set(issues)];

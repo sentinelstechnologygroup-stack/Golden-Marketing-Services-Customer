@@ -759,11 +759,18 @@ exports.communications = onCall({ enforceAppCheck: true, secrets: [telnyxApiKey]
   // browser token retained after an administrator revokes access.
   request={...request,auth:{...authenticated,token:{...authenticated.token,gmsSuperAdmin:freshUser.customClaims?.gmsSuperAdmin===true}}};
   const { caller, assignment } = await requireAgentAssignment(request, tenantId, roles);
+  const restrictedCallingTest = process.env.TELEPHONY_TEST_ONLY === 'true';
+  let callingTestApproval;
+  if(restrictedCallingTest) {
+    callingTestApproval=(await db.doc(`gmsTestingApprovals/${tenantId}`).get()).data();
+    try {require('./telephony/test-scope.cjs').authorizeActor(callingTestApproval,caller.uid);}
+    catch {throw new HttpsError('permission-denied','This calling test is restricted to its approved operator.');}
+  }
   if (!['health_check', 'start_call', 'bind_call', 'end_call', 'hold_call', 'resume_call', 'warm_transfer', 'claim_lead', 'release_lead', 'set_availability', 'start_consultation', 'complete_transfer', 'cancel_transfer', 'mute_call', 'browser_session', 'send_sms', 'start_recording', 'call_status'].includes(action)) throw new HttpsError('invalid-argument', 'Unsupported communications action.');
   if(action==='send_sms') throw new HttpsError('failed-precondition','Use the approved CRM messaging workflow for SMS.');
   if(action==='start_recording') throw new HttpsError('failed-precondition','Recording is started by verified call events under the configured policy.');
   if (action === 'health_check') {
-    try { const provider = phoneProvider(); const issues = require('./telephony/readiness.cjs').configurationIssues(process.env); const healthy = process.env.TELEPHONY_ENABLED === 'true' && issues.length === 0; return {ok:true, configured:issues.length===0, healthy, mode:healthy?'production':'unavailable', provider:provider.name, recordingPolicy:process.env.DEFAULT_RECORDING_POLICY || 'record_on_consent', warmTransferEnabled:healthy && process.env.TELEPHONY_WARM_TRANSFER_ENABLED==='true', actorUid:caller.uid, ...(!healthy?{warning:'Calling is awaiting verified phone-service configuration.'}:{})}; }
+    try { const provider = phoneProvider(); const issues = require('./telephony/readiness.cjs').configurationIssues(process.env); const healthy = process.env.TELEPHONY_ENABLED === 'true' && issues.length === 0; return {ok:true, configured:issues.length===0, healthy, mode:healthy?'production':'unavailable', provider:provider.name, recordingPolicy:restrictedCallingTest?'do_not_record':process.env.DEFAULT_RECORDING_POLICY || 'record_on_consent', testOnly:restrictedCallingTest, warmTransferEnabled:healthy && process.env.TELEPHONY_WARM_TRANSFER_ENABLED==='true', actorUid:caller.uid, ...(!healthy?{warning:'Calling is awaiting verified phone-service configuration.'}:{})}; }
     catch { return {ok:true,configured:false,healthy:false,mode:'unavailable',warning:'Calling is awaiting phone-service configuration.'}; }
   }
   if (action === 'set_availability') {
@@ -874,6 +881,10 @@ exports.communications = onCall({ enforceAppCheck: true, secrets: [telnyxApiKey]
     try { number = require('./telephony/readiness.cjs').selectOutboundNumber(numbers.docs.map(doc=>doc.data()),provider.name,leadData.campaignId || leadData.campaign_id); }
     catch { throw new HttpsError('failed-precondition','Configure one active outbound number for this Brand or campaign.'); }
     if (!number?.phoneNumber) throw new HttpsError('failed-precondition','Configure an active client phone number for the selected provider.');
+    if(restrictedCallingTest) {
+      try {require('./telephony/test-scope.cjs').authorizeLead(callingTestApproval,leadId,leadData,number);}
+      catch {throw new HttpsError('permission-denied','Only the approved test leads and caller ID may be dialed.');}
+    }
     if (leadData.disposition==='do_not_call' || leadData.doNotCall===true) throw new HttpsError('failed-precondition','This contact cannot be called.');
     const brandSnapshot=await db.doc(`tenants/${tenantId}/brands/${brandId}`).get();
     const agentProvision=(await db.doc(`agentUsers/${caller.uid}/assignments/${tenantId}`).get()).data();
@@ -885,13 +896,13 @@ exports.communications = onCall({ enforceAppCheck: true, secrets: [telnyxApiKey]
       agentSipUsername=credential.sip_username;
       agentSipDestination=require('./telephony/server-dial.cjs').agentDestination(agentSipUsername);
     } catch {throw new HttpsError('failed-precondition','Agent browser identity is not provisioned.');}
-    const recordingPolicy=brandSnapshot.data()?.recordingPolicy || process.env.DEFAULT_RECORDING_POLICY || 'record_on_consent';
+    const recordingPolicy=restrictedCallingTest?'do_not_record':brandSnapshot.data()?.recordingPolicy || process.env.DEFAULT_RECORDING_POLICY || 'record_on_consent';
     if(!['do_not_record','record_on_consent','record_all'].includes(recordingPolicy)) throw new HttpsError('failed-precondition','The Brand recording policy is invalid.');
     if(recordingPolicy==='record_on_consent' && params.recordingConsent!==true) throw new HttpsError('failed-precondition','Confirm the approved recording disclosure before calling.');
     if(recordingPolicy!=='do_not_record' && process.env.GMS_RECORDING_PIPELINE_READY!=='true') throw new HttpsError('failed-precondition','Private call evidence configuration must pass before recording calls.');
     const qualificationFormId=leadData.qualificationFormId || brandSnapshot.data()?.qualificationFormId || null;
     let qualificationRubric=null,qualificationRubricVersion=null;
-    if(qualificationFormId) {
+    if(qualificationFormId && !restrictedCallingTest) {
       if(!/^[A-Za-z0-9_-]{1,128}$/.test(qualificationFormId)) throw new HttpsError('failed-precondition','The qualification form identifier is invalid.');
       const form=(await db.doc(`tenants/${tenantId}/qualificationForms/${qualificationFormId}`).get()).data();
       if(!form || form.brandId!==brandId || !['active','approved'].includes(form.status)) throw new HttpsError('failed-precondition','An approved Brand qualification form is required.');
