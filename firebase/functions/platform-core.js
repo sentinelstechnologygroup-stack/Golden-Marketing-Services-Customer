@@ -871,7 +871,7 @@ exports.communications = onCall({ enforceAppCheck: true, secrets: [telnyxApiKey]
   let brandId = null;
   let callRef = null;
   if (action === 'start_call') {
-    if (!['available','after_call_work'].includes(assignment.agentStatus)) throw new HttpsError('failed-precondition','Set Available in the workspace phone control panel before dialing.');
+    if (!['available','after_call_work'].includes((assignment || (await db.doc(`agentUsers/${caller.uid}/assignments/${tenantId}`).get()).data())?.agentStatus)) throw new HttpsError('failed-precondition','Set Available in the workspace phone control panel before dialing.');
     if (!leadId) throw new HttpsError('invalid-argument', 'An authorized leadId is required.');
     const leadSnapshot = await db.doc(`tenants/${tenantId}/leads/${leadId}`).get();
     if (!leadSnapshot.exists || leadSnapshot.data().tenantId !== tenantId) throw new HttpsError('not-found', 'Lead not found.');
