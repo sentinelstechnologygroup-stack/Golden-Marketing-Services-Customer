@@ -774,8 +774,13 @@ exports.communications = onCall({ enforceAppCheck: true, secrets: [telnyxApiKey]
     catch { return {ok:true,configured:false,healthy:false,mode:'unavailable',warning:'Calling is awaiting phone-service configuration.'}; }
   }
   if (action === 'set_availability') {
-    if (!['offline','available','away','after_call_work'].includes(params.status)) throw new HttpsError('invalid-argument','Invalid availability.');
-    await db.doc(`agentUsers/${caller.uid}/assignments/${tenantId}`).set({agentStatus:params.status,presenceUpdatedAt:FieldValue.serverTimestamp()},{merge:true});
+    if (!['offline','available','away','after_call_work','standby','do_not_disturb','break','busy'].includes(params.status)) throw new HttpsError('invalid-argument','Invalid availability.');
+    const presenceRef=db.doc(`agentUsers/${caller.uid}/assignments/${tenantId}`);
+    await db.runTransaction(async tx=>{const previous=(await tx.get(presenceRef)).data() || {};const changed=previous.agentStatus!==params.status;const now=Date.now();
+      tx.set(presenceRef,{agentStatus:params.status,presenceUpdatedAt:FieldValue.serverTimestamp(),...(changed?{statusChangedAt:FieldValue.serverTimestamp()}: {})},{merge:true});
+      tx.set(db.doc(`agentUsers/${caller.uid}`),{agent_status:params.status,presenceUpdatedAt:FieldValue.serverTimestamp()},{merge:true});
+      if(changed) tx.create(db.collection('gmsAgentPresenceEvents').doc(),{tenantId,agentUid:caller.uid,status:params.status,previousStatus:previous.agentStatus || 'offline',previousDurationSeconds:previous.statusChangedAt?.toMillis ? Math.max(0,Math.floor((now-previous.statusChangedAt.toMillis())/1000)):null,occurredAt:FieldValue.serverTimestamp()});
+    });
     return {ok:true,status:params.status};
   }
   if (action === 'claim_lead' || action === 'release_lead') {
@@ -866,6 +871,7 @@ exports.communications = onCall({ enforceAppCheck: true, secrets: [telnyxApiKey]
   let brandId = null;
   let callRef = null;
   if (action === 'start_call') {
+    if (!['available','after_call_work'].includes(assignment.agentStatus)) throw new HttpsError('failed-precondition','Set Available in the workspace phone control panel before dialing.');
     if (!leadId) throw new HttpsError('invalid-argument', 'An authorized leadId is required.');
     const leadSnapshot = await db.doc(`tenants/${tenantId}/leads/${leadId}`).get();
     if (!leadSnapshot.exists || leadSnapshot.data().tenantId !== tenantId) throw new HttpsError('not-found', 'Lead not found.');
