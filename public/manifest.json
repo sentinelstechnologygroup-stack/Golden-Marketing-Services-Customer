@@ -2,7 +2,7 @@
   "id": "/",
   "name": "Golden Marketing Services Customer Portal",
   "short_name": "GMS Customer",
-  "start_url": "/login",
+  "start_url": "/dashboard",
   "scope": "/",
   "display": "standalone",
   "background_color": "#0B1F33",
@@ -20,5 +20,6 @@
       "type": "image/png",
       "purpose": "any"
     }
-  ]
+  ],
+  "description": "Golden Marketing Services secure customer portal"
 }

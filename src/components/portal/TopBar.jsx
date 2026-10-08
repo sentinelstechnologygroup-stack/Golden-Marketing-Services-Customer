@@ -1,3 +1,4 @@
+import DesktopInstallButton from '@/components/DesktopInstallButton';
 import { useNavigate } from "react-router-dom";
 import { Menu, Bell, ChevronDown } from "lucide-react";
 import { usePortalAuth } from "@/lib/PortalAuthContext";
@@ -33,6 +34,7 @@ export default function TopBar({ title, onOpenMenu }) {
         </div>
       </div>
 
+<DesktopInstallButton />
       <button
         onClick={() => navigate("/notifications")}
         aria-label="Notifications"

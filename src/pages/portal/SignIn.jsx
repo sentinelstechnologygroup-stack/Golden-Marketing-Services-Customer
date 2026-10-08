@@ -1,3 +1,4 @@
+import DesktopInstallButton from '@/components/DesktopInstallButton';
 import { useState, useEffect } from "react";
 import { useNavigate, useLocation, Link } from "react-router-dom";
 import { Eye, EyeOff, ShieldCheck, Lock, LifeBuoy } from "lucide-react";
@@ -108,6 +109,7 @@ export default function SignIn() {
             <Logo size={30} />
           </div>
 
+          <div className="mb-5"><DesktopInstallButton /></div>
       <div className="eyebrow mb-2" style={{ color: "var(--teal)" }}>Customer Portal</div>
           <h2 className="font-display text-[26px] font-semibold leading-tight" style={{ color: "var(--shell)" }}>
             Sign in to your account
