@@ -1,3 +1,4 @@
+import {usePortalSessionLimit, PortalUpdateNotice} from './PortalSessionPolicy';
 import { createContext, useContext, useEffect, useState, useCallback } from "react";
 import portalAdapter from "@/services/portalAdapter";
 
@@ -47,6 +48,7 @@ export function PortalAuthProvider({ children }) {
   }, []);
 
   const signOut = useCallback(async () => {
+    localStorage.removeItem('gms-customer-session-activity');
     if (portalAdapter.isBypassMode()) {
       const s = await portalAdapter.auth.getSession();
       setSession(s);
@@ -58,8 +60,9 @@ export function PortalAuthProvider({ children }) {
     setSession(null); setPendingMfa(null); setStatus("unauthenticated");
   }, []);
 
+  usePortalSessionLimit(status === 'authenticated' && !portalAdapter.isBypassMode(), signOut, 'gms-customer');
   const value = { session, status, pendingMfa, error, setError, signIn, verifyMfa, cancelMfa, signOut, refresh, isPreview: portalAdapter.isPreviewMode };
-  return <PortalAuthContext.Provider value={value}>{children}</PortalAuthContext.Provider>;
+  return <PortalAuthContext.Provider value={value}><PortalUpdateNotice />{children}</PortalAuthContext.Provider>;
 }
 
 export function usePortalAuth() {
