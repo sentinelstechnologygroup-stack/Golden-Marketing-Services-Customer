@@ -824,7 +824,7 @@ exports.communications = onCall({ enforceAppCheck: true, secrets: [telnyxApiKey]
     if(!snapshot.exists) throw new HttpsError('not-found','Call not found.');
     const call=snapshot.data(); requireAssignmentBrand(assignment,recordBrandId(call));
     if(call.tenantId!==tenantId || call.agentUid!==caller.uid || call.provider!==provider.name) throw new HttpsError('permission-denied','Call ownership or provider mismatch.');
-    if(action==='call_status') return {ok:true,callId:callSid,status:call.status,browserState:call.browserState || null,transferStatus:call.transferStatus || null,handoffRecipientName:call.handoffOrder?.[call.handoffIndex || 0]?.name || null,recordingStatus:call.recordingStatus || null};
+    if(action==='call_status') return {ok:true,callId:callSid,status:call.status,browserState:call.browserState || null,transferStatus:call.transferStatus || null,conferenceReady:Boolean(call.conferenceId && call.leadConferenceJoined),handoffRecipientName:call.handoffOrder?.[call.handoffIndex || 0]?.name || null,recordingStatus:call.recordingStatus || null};
     if(provider.name!=='telnyx') throw new HttpsError('failed-precondition','Browser call binding is only used by the selected phone service.');
     if(typeof params.browserCallId!=='string' || !params.browserCallId || typeof params.providerCallId!=='string' || !params.providerCallId) throw new HttpsError('invalid-argument','Provider call identifiers are required.');
     if(!call.providerCallId) throw new HttpsError('failed-precondition','Awaiting a verified provider webhook.');
