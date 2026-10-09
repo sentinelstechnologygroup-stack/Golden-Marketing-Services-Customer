@@ -982,7 +982,9 @@ exports.communications = onCall({ enforceAppCheck: true, secrets: [telnyxApiKey]
     const existing = callSnapshot.data();
     if (existing.provider !== provider.name || existing.agentUid !== caller.uid) throw new HttpsError('permission-denied','Call ownership or provider mismatch.');
     if (!existing.providerCallId) throw new HttpsError('failed-precondition','The browser call has not connected to the phone service.');
-    result = existing.conferenceId ? await provider.hold(existing.conferenceId,existing.providerCallId,action==='hold_call') : await provider.holdCall(existing.providerCallId,action==='hold_call');
+    if (!existing.conferenceId) throw new HttpsError('failed-precondition','Hold is unavailable on this two-party connectivity test. Conference hold and warm transfer still require verification.');
+    try { result = await provider.hold(existing.conferenceId,existing.providerCallId,action==='hold_call'); }
+    catch { throw new HttpsError('failed-precondition','The phone service could not change hold state. The call state was not updated.'); }
   } else {
     callRef = db.doc(`tenants/${tenantId}/callRecords/${callSid}`);
     const callSnapshot = await callRef.get();
