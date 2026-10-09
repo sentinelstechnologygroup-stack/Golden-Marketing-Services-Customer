@@ -261,7 +261,7 @@ exports.prepareGmsClientLogin = onCall(options, async request => {
     tx.set(root.collection('config').doc('clientAccess'), { adminEmail:email, status:'active', updatedAt:FieldValue.serverTimestamp() });
     tx.set(root.collection('auditLogs').doc(), { tenantId, action:'client.identity_prepared', actorUid:caller.user.uid, target:user.uid, createdAt:FieldValue.serverTimestamp() });
   });
-  const setupLink = await getAuth().generatePasswordResetLink(email, { url:'https://customer.goldenmarketingservices.com/login', handleCodeInApp:false });
+  const setupLink = require('./onboarding-email.cjs').brandedActionLink(await getAuth().generatePasswordResetLink(email, { url:'https://customer.goldenmarketingservices.com/login', handleCodeInApp:false }), 'client');
   // Only returned to the GMS admin; never persist this credential/link or send email implicitly.
   return { setupLink, email, delivery:'not_sent' };
 });

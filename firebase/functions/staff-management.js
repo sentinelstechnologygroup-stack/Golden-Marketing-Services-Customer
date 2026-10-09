@@ -68,7 +68,7 @@ exports.createGmsStaff = onCall(options, async request => {
   await auth.setCustomUserClaims(uid, { role: data.role, gmsSuperAdmin: data.role === 'gms_super_admin' });
   await auth.updateUser(uid, { disabled: false });
   await audit(actorUid, data.tenantId, 'staff.created', uid);
-  const setupLink = await auth.generatePasswordResetLink(data.email, { url: 'https://agentcrm.goldenmarketingservices.com/login', handleCodeInApp: false });
+  const setupLink = require('./onboarding-email.cjs').brandedActionLink(await auth.generatePasswordResetLink(data.email, { url: 'https://agentcrm.goldenmarketingservices.com/login', handleCodeInApp: false }), 'staff');
   return { uid, email: data.email, role: data.role, setupLink, delivery: 'not_sent', phoneReady: false };
 });
 exports.getGmsStaffSetupLink = onCall(options, async request => {
@@ -77,7 +77,7 @@ exports.getGmsStaffSetupLink = onCall(options, async request => {
   const user = await getAuth().getUser(uid), record = await db.doc(`agentUsers/${uid}`).get();
   if (user.disabled || record.data()?.managedBy !== 'gms_staff') throw new HttpsError('failed-precondition', 'Staff access is unavailable.');
   await audit(actorUid, request.data.tenantId, 'staff.setup_link.created', uid);
-  return { setupLink: await getAuth().generatePasswordResetLink(user.email, { url: 'https://agentcrm.goldenmarketingservices.com/login', handleCodeInApp: false }), delivery: 'not_sent' };
+  return { setupLink: require('./onboarding-email.cjs').brandedActionLink(await getAuth().generatePasswordResetLink(user.email, { url: 'https://agentcrm.goldenmarketingservices.com/login', handleCodeInApp: false }), 'staff'), delivery: 'not_sent' };
 });
 exports.provisionGmsStaffPhone = onCall({ ...options, secrets: [key] }, async request => {
   const actorUid = await admin(request), { uid, tenantId } = request.data || {};

@@ -14,6 +14,7 @@ import { isPreviewMode } from "@/services/portalAdapter";
 import { isPortalAdmin } from "@/lib/adminAccess";
 
 // Public auth pages (eager — small, needed before any protected route)
+import PasswordSetup from '@/pages/PasswordSetup';
 import SignIn from "@/pages/portal/SignIn";
 import ForgotPassword from "@/pages/portal/ForgotPassword";
 import Verify from "@/pages/portal/Verify";
@@ -69,6 +70,7 @@ function AppRoutes() {
   return (
     <Routes>
       <Route path="/" element={<RootRedirect />} />
+      <Route path="/set-password" element={<PasswordSetup />} />
       <Route path="/login" element={<SignIn />} />
       <Route path="/sign-in" element={<Navigate to="/login" replace />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />

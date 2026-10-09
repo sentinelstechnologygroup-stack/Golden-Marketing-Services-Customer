@@ -13,3 +13,5 @@ Object.assign(exports, require('./call-evidence-access'));
 Object.assign(exports, require('./recording-analysis'));
 
 Object.assign(exports, require('./staff-management'));
+
+Object.assign(exports, require('./onboarding-delivery'));

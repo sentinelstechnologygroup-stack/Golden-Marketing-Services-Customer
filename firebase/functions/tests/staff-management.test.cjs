@@ -28,7 +28,7 @@ function fixture({ admin = true, existing = false } = {}) {
     createUser: async user => { created.push(user); return user; },
     setCustomUserClaims: async (uid, value) => claims.push(value),
     updateUser: async () => {},
-    generatePasswordResetLink: async () => 'https://fixture.invalid/private-setup',
+    generatePasswordResetLink: async () => 'https://gms-prod-1089114348316.firebaseapp.com/__/auth/action?mode=resetPassword&oobCode=fixture-only',
   };
   const db = { doc: path => ({ path, get: async () => ({ exists: true, data: () => ({ name: 'Fixture client' }) }) }), batch: () => ({ set: (ref,value) => writes.push({ path: ref.path, value }), commit: async () => {} }), collection: () => ({ add: async () => {} }) };
   class HttpsError extends Error { constructor(code,message) { super(message); this.code=code; } }
@@ -39,6 +39,7 @@ function fixture({ admin = true, existing = false } = {}) {
     'firebase-functions/v2/https': { onCall: (_,handler) => handler, HttpsError },
     'firebase-functions/params': { defineSecret: () => ({ value: () => 'fixture-only' }) },
     './staff-policy.cjs': policy,
+    './onboarding-email.cjs': require('../onboarding-email.cjs'),
   };
   vm.runInNewContext(fs.readFileSync(require.resolve('../staff-management'),'utf8'), { exports, require: name => dependencies[name] || require(name), AbortSignal, process: { env: {} } });
   return { exports, created, claims, writes };
