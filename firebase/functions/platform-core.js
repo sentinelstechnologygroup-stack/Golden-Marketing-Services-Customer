@@ -592,8 +592,9 @@ exports.getLiveReport = onCall({ enforceAppCheck: false }, async (request) => {
 
 exports.getAgentCollection = onCall({ enforceAppCheck: false }, async (request) => {
   const { tenantId, collectionName, limit: requestedLimit = 200 } = request.data || {};
-  const { assignment } = await requireAgentAssignment(request, tenantId, ['admin', 'supervisor', 'agent', 'auditor']);
+  const { assignment } = await requireAgentAssignment(request, tenantId, ['admin', 'supervisor', 'agent', 'ai_admin', 'auditor']);
   if (!AGENT_COLLECTIONS.has(collectionName)) throw new HttpsError('invalid-argument', 'Collection is not available through the CRM API.');
+  if (assignment && !require('./staff-policy.cjs').collectionAllowed(assignment.role, collectionName)) throw new HttpsError('permission-denied', 'This collection is outside your job role.');
   const pageSize = Math.min(Math.max(Number(requestedLimit) || 200, 1), 500);
   const snapshot = await db.collection(`tenants/${tenantId}/${collectionName}`).where('tenantId', '==', tenantId).limit(pageSize).get();
   const rows = snapshot.docs
@@ -610,6 +611,7 @@ exports.createAgentRecord = onCall({ enforceAppCheck: true }, async (request) =>
   const roles = writeRolesFor(collectionName);
   if (!roles.length) throw new HttpsError('permission-denied', 'This collection is not writable through the CRM API.');
   const authorization = await requireAgentAssignment(request, tenantId, roles);
+  if (authorization.assignment && !require('./staff-policy.cjs').collectionAllowed(authorization.assignment.role, collectionName, true)) throw new HttpsError('permission-denied', 'This action is outside your job role.');
   const input = applyAssignmentBrand(authorization.assignment, collectionName, data);
   validateRequiredFields(collectionName, input);
   if (collectionName === 'leads' && INDUSTRY_POLICY_FIELDS.some((field) => input[field] === undefined && field !== 'receivedAt')) throw new HttpsError('invalid-argument', 'Lead workflow metadata is required.');
@@ -622,12 +624,14 @@ exports.updateAgentRecord = onCall({ enforceAppCheck: true }, async (request) =>
   const roles = writeRolesFor(collectionName);
   if (!roles.length) throw new HttpsError('permission-denied', 'This collection is not writable through the CRM API.');
   const { caller, assignment } = await requireAgentAssignment(request, tenantId, roles);
+  if (assignment && !require('./staff-policy.cjs').collectionAllowed(assignment.role, collectionName, true)) throw new HttpsError('permission-denied', 'This action is outside your job role.');
   const recordRef = db.doc(`tenants/${tenantId}/${collectionName}/${recordId}`);
   const current = await recordRef.get();
   if (!current.exists || current.data().tenantId !== tenantId) throw new HttpsError('not-found', 'Record not found.');
   if (current.data().managedBy === 'onboarding') throw new HttpsError('failed-precondition', 'Update this configuration in Agent Portal > Clients > onboarding.');
   requireAssignmentBrand(assignment, recordBrandId(current.data()));
   const patch = stripImmutablePatch(data);
+  if (assignment?.role === 'agent' && collectionName === 'leads' && Object.hasOwn(patch, 'assignedTo') && patch.assignedTo !== current.data().assignedTo) throw new HttpsError('permission-denied', 'A supervisor must reassign leads.');
   if(['callTranscripts','callQualityReviews'].includes(collectionName) &&
     (current.data().aiGenerated===true || current.data().managedBy==='recording_worker' || patch.aiGenerated===true || patch.managedBy==='recording_worker')) throw new HttpsError('permission-denied','AI evidence is managed by the backend. Add a separate human review.');
   if (collectionName === 'callRecords' && current.data().provider === 'telnyx') {
