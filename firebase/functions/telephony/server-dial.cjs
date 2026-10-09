@@ -19,7 +19,7 @@ function agentDial(callId,call,callbackUrl) {
 }
 function leadDial(callId,call,callbackUrl) {
   if(!call.agentCallId || call.agentLegStatus!=='answered' || call.leadDialStatus!=='requested' || !/^\+[1-9]\d{7,14}$/.test(call.destination || '')) throw new Error('Agent must answer before calling the lead.');
-  return {to:call.destination,from:call.from,callbackUrl,linkTo:call.agentCallId,
+  return {to:call.destination,from:call.from,callbackUrl,...(call.conferenceMode?{}:{linkTo:call.agentCallId}),
     commandId:commandId(callId,'lead'),clientState:state(callId,call.tenantId,'lead')};
 }
-module.exports={agentDial,leadDial,agentDestination};
+module.exports={agentDial,leadDial,agentDestination,state,commandId};

@@ -36,12 +36,12 @@ test('Telnyx client state correlates browser calls without trusting a destinatio
  const event=normalizeEvent('telnyx',{data:{id:'event',event_type:'call.initiated',payload:{call_control_id:'provider-leg',client_state}}},Buffer.from(''));
  assert.equal(event.tenantId,'tenant-one'); assert.equal(event.gmsCallId,'call-one'); assert.equal(event.callId,'provider-leg');
 });
-test('Telnyx can hold a direct browser call before any conference handoff',async()=>{
- const requests=[];
- const api=createProvider('telnyx',{token:'private-token',connectionId:'connection'},async(url,options)=>{requests.push({url,options});return {ok:true,json:async()=>({data:{result:'ok'}})};});
- await api.holdCall('provider-leg',true);
- assert.match(requests[0].url,/calls\/provider-leg\/actions\/hold$/);
+test('conference commands isolate the lead and do not end the conference when the agent leaves',async()=>{
+ const requests=[];const api=createProvider('telnyx',{token:'test-key',connectionId:'connection'},async(url,options)=>{requests.push({url,body:JSON.parse(options.body || '{}')});return {ok:true,json:async()=>({data:{id:'conference-one'}})};});
+ await api.conference('agent-leg','call-one');await api.join('conference-one','lead-leg');await api.hold('conference-one','lead-leg',true);await api.remove('conference-one','agent-leg');
+ assert.equal(requests[0].body.max_participants,3);assert.equal(requests[1].body.end_conference_on_exit,false);assert.deepEqual(requests[2].body.call_control_ids,['lead-leg']);assert.equal(requests[3].body.call_control_id,'agent-leg');assert.ok(requests.every(r=>!r.url.includes('record')));
 });
+
 test('Telnyx browser tokens require a provisioned agent and never return the API key',async()=>{
  await assert.rejects(()=>browserSession('telnyx',{token:'private-api-key'},'agent',{}));
  const session=await browserSession('telnyx',{token:'private-api-key',browserConnectionId:'receive-only'},'agent',{telnyxCredentialId:'credential'},async(url,opts)=>{assert.equal(opts.headers.Authorization,'Bearer private-api-key');if(url.endsWith('/token')) return {ok:true,text:async()=>'short-lived-token'};return {ok:true,json:async()=>({data:url.includes('/credential_connections/')?{active:true,outbound:{outbound_voice_profile_id:null}}:{connection_id:'receive-only'}})};});

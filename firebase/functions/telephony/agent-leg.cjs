@@ -25,6 +25,8 @@ async function handleAgentLeg({db,event,connectionId,provider,callbackUrl,enable
     });
     if(dial) {
       try {
+        const call=(await ref.get()).data();
+        if(call.conferenceMode && !call.conferenceId){const conference=await provider.conference(event.callId,ref.id);if(!conference?.id)throw new Error('Missing conference');await ref.update({conferenceId:conference.id,conferenceStatus:'ready'});} 
         const result=await provider.start(dial);
         if(!result.id) throw new Error('Missing lead leg.');
         await db.runTransaction(async tx=>{
@@ -41,7 +43,7 @@ async function handleAgentLeg({db,event,connectionId,provider,callbackUrl,enable
   }
   if(event.status==='completed') {
     const call=(await ref.get()).data();
-    if(call.providerCallId && !['completed','failed'].includes(call.status)) await provider.end(call.providerCallId);
+    if(call.providerCallId && !['completion_requested','completed'].includes(call.transferStatus) && !['completed','failed'].includes(call.status)) await provider.end(call.providerCallId);
     if(!call.providerCallId && !call.leadDialStatus) {
       await db.runTransaction(async tx=>{
         const leadRef=db.doc(`tenants/${call.tenantId}/leads/${call.leadId}`),lead=await tx.get(leadRef);
