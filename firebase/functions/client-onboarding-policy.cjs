@@ -13,6 +13,7 @@ function normalize(input = {}) {
     timezone: text(input.timezone, 80) || 'America/Chicago', brandName: text(input.brandName, 200),
     locationId: text(input.locationId, 100), phoneNumber: text(input.phoneNumber, 30),
     telnyxPhoneNumberId: text(input.telnyxPhoneNumberId, 100), billingNotes: text(input.billingNotes, 2000), notes: text(input.notes, 4000),
+    callTree: require('./client-call-tree.cjs').normalize(input.callTree || {}),
     campaigns: (Array.isArray(input.campaigns) ? input.campaigns : []).slice(0, 12).map(c => ({
       id: id(c.id).toLowerCase(), name: text(c.name, 200), type: text(c.type, 100), source: text(c.source, 200),
       calendarId: text(c.calendarId, 100), pipelineId: text(c.pipelineId, 100),

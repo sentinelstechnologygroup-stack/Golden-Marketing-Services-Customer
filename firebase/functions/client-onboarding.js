@@ -296,3 +296,12 @@ exports.enableGmsClientRouting = onCall(options, async request => {
   });
   return workspace(tenantId,caller);
 });
+
+exports.saveGmsClientCallTree = onCall(options, async request=>{
+ const tenantId=identifier(request.data?.clientId);const caller=await access(request,tenantId,false);
+ let tree;try{tree=require('./client-call-tree.cjs').normalize(request.data.callTree);}catch(e){throw new HttpsError('invalid-argument',e.message);}
+ const ref=db.doc(`tenants/${tenantId}/config/onboarding`);
+ await db.runTransaction(async tx=>{const current=await tx.get(ref);if(!current.exists || current.data().revision!==request.data.revision)throw new HttpsError('aborted','Client profile changed. Reload before saving.');tx.update(ref,{'data.callTree':tree,revision:current.data().revision+1,updatedAt:FieldValue.serverTimestamp()});});
+ await db.collection(`tenants/${tenantId}/auditLogs`).add({action:'client.handoff_tree.saved',actorUid:caller.user.uid,occurredAt:FieldValue.serverTimestamp()});
+ return workspace(tenantId,caller);
+});

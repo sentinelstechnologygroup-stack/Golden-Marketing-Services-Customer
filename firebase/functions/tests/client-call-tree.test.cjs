@@ -1,0 +1,6 @@
+const test=require('node:test');const assert=require('node:assert/strict');const {normalize,plan}=require('../client-call-tree.cjs');
+const rows=[{id:'jonathan',name:'Jonathan',phone:'9365370568'},{id:'bob',name:'Bob',phone:'+12532226335'},{id:'sandy',name:'Sandy',phone:'+12025550111',enabled:false}];
+test('fixed order always begins at first enabled recipient and normalizes phone numbers',()=>{const p=plan({callTree:{mode:'fixed',recipients:rows}},1);assert.deepEqual(p.recipients.map(r=>r.id),['jonathan','bob']);assert.equal(p.recipients[0].phone,'+19365370568');});
+test('rotation starts after cursor and skips paused recipients and the lead own number',()=>{const p=plan({callTree:{mode:'rotating',recipients:rows}},1,'+19365370568');assert.deepEqual(p.recipients.map(r=>r.id),['bob']);});
+test('single client profile contact remains a legacy fallback',()=>{assert.equal(plan({name:'GCR',phone:'+19365370568'}).recipients[0].phone,'+19365370568');});
+test('reject malformed and duplicate destination data before any provider dialing',()=>{assert.throws(()=>normalize({recipients:[rows[0],rows[0]]}));assert.throws(()=>normalize({mode:'random',recipients:rows}));assert.throws(()=>normalize({recipients:[{id:'evil',name:'Example',phone:'sip:bad'}]}));});

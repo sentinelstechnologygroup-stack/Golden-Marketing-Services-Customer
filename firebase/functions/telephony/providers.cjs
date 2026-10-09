@@ -13,7 +13,7 @@ function createProvider(name,config,transport=fetch){
  const conferencePath=id=>'/conferences/'+encodeURIComponent(id)+'/actions';
  return {name,
   async credential(id){const data=await request('/telephony_credentials/'+encodeURIComponent(id),{},'GET');return {...data,connection_id:require('./credential-identity.cjs').connectionId(data)};},
-  async start({to,from,callbackUrl,commandId,clientState,linkTo}){required({from,callbackUrl},['from','callbackUrl']);const result=await request('/calls',{to,from,connection_id:config.connectionId,webhook_url:callbackUrl,command_id:commandId,...(clientState?{client_state:clientState}:{}),...(linkTo?{link_to:linkTo,bridge_intent:true,bridge_on_answer:true,prevent_double_bridge:true}:{})});return {id:result.call_control_id,status:result.status||'queued'};},
+  async start({to,from,callbackUrl,commandId,clientState,linkTo,timeoutSeconds}){required({from,callbackUrl},['from','callbackUrl']);const result=await request('/calls',{to,from,connection_id:config.connectionId,webhook_url:callbackUrl,command_id:commandId,...(timeoutSeconds?{timeout_secs:timeoutSeconds}:{}),...(clientState?{client_state:clientState}:{}),...(linkTo?{link_to:linkTo,bridge_intent:true,bridge_on_answer:true,prevent_double_bridge:true}:{})});return {id:result.call_control_id,status:result.status||'queued'};},
   async end(id) {
     try { return await request(callPath(id)+'/hangup'); }
     catch (error) {

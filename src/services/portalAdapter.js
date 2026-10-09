@@ -458,6 +458,7 @@ const setMemberStatus = (uid, active) => (isDataFixtureMode() ? delay().then(() 
 
 export const portalAdapter = {
   onboarding: {
+    saveCallTree: async data => {if(!isFirebaseMode || isDataFixtureMode())throw new PortalApiError(400,'Handoff routing requires an authenticated live client account.');return (await httpsCallable(firebaseFunctions,'saveGmsClientCallTree')({...data,clientId:await getActiveTenantId()})).data;},
     get: async () => {
       if (!isFirebaseMode || isDataFixtureMode()) return { data: { campaigns: [] }, campaignVersions: {}, approvals: {}, documents: [] };
       return (await httpsCallable(firebaseFunctions, 'getGmsClient')({ clientId: await getActiveTenantId() })).data;
