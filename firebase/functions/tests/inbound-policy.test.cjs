@@ -57,3 +57,8 @@ test('approved same-mobile test handoffs retain Patrick first and Jonathan backu
  assert.deepEqual(plan(data,0,undefined).recipients.map(r=>r.id),['patrick','jonathan']);
  assert.deepEqual(plan(data,0,'+12532226335').recipients.map(r=>r.id),['jonathan']);
 });
+
+test('legacy administrator operator remains eligible only with explicit brand and fresh presence',()=>{
+ const a={status:'active',role:'admin',brandIds:['gcr'],agentStatus:'available',inboundEnabled:true,telnyxCredentialId:'credential',presenceUpdatedAt:{toMillis:()=>Date.now()}};
+ assert.equal(eligible(a,'gcr'),true);assert.equal(eligible({...a,brandIds:[]},'gcr'),false);assert.equal(eligible({...a,presenceUpdatedAt:{toMillis:()=>0}},'gcr'),false);
+});

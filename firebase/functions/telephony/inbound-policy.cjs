@@ -6,7 +6,7 @@ function openNow(route, now=new Date()) {
   return minute >= route.openMinute && minute < route.closeMinute;
 }
 function eligible(assignment,brandId,now=Date.now()) {
-  return assignment?.status==='active' && ['agent','supervisor','gms_super_admin'].includes(assignment.role)
+  return assignment?.status==='active' && ['agent','supervisor','gms_super_admin','admin'].includes(assignment.role)
     && [assignment.brandId,...(assignment.brandIds || [])].includes(brandId)
     && assignment.agentStatus==='available' && assignment.inboundEnabled===true
     && assignment.telnyxCredentialId && assignment.presenceUpdatedAt?.toMillis?.()>now-75000;

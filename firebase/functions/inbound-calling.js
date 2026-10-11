@@ -25,7 +25,7 @@ async function authorized(request) {
   const user=await getAuth().getUser(request.auth.uid);
   if(user.disabled || user.customClaims?.mustChangePassword)throw new HttpsError('permission-denied','Account unavailable.');
   const ref=db.doc(`agentUsers/${user.uid}/assignments/${tenantId}`),assignment=(await ref.get()).data(),route=await routeFor(tenantId);
-  if(!route?.enabled || assignment?.status!=='active' || !['agent','supervisor','gms_super_admin'].includes(assignment.role) || ![assignment.brandId,...(assignment.brandIds || [])].includes(route.brandId))throw new HttpsError('permission-denied','No inbound assignment for this client.');
+  if(!route?.enabled || assignment?.status!=='active' || !(['agent','supervisor','gms_super_admin'].includes(assignment.role) || assignment.role==='admin' && user.customClaims?.gmsSuperAdmin===true) || ![assignment.brandId,...(assignment.brandIds || [])].includes(route.brandId))throw new HttpsError('permission-denied','No inbound assignment for this client.');
   return {user,tenantId,ref,assignment,route};
 }
 async function matchLead(route,caller,callId) {
@@ -58,7 +58,29 @@ async function queue(ref,route) {
   await ref.update({conferenceId:conf.id,conferenceStatus:'waiting_for_agent'});
   await db.doc(`gmsCallBindings/${ref.id}`).update({recordingRequested:true,recordingPolicy:'record_all',recordingDisclosurePlayed:true});
   await command(call.providerCallId,'playback_start',{playback_content:require('./telephony/hold-music.cjs').holdMusic(),audio_type:'wav',loop:'infinity',target_legs:'self',command_id:require('./telephony/server-dial.cjs').commandId(ref.id,'queue-music')});
-  await ref.update({status:'queued',queueDeadline:Timestamp.fromMillis(Date.now()+45000),updatedAt:stamp()});
+  await ref.update({status:'queued',queueDeadline:Timestamp.fromMillis(Date.now()+(route.maxWaitSeconds || 600)*1000),lastQueuePromptAt:stamp(),queueCycle:0,updatedAt:stamp()});
+  await queueWindow(ref,{...call,queueCycle:0},false);
+}
+async function queueWindow(ref,call,startMusic=true) {
+  if((await ref.get()).data()?.status!=='queued')return;
+  if(startMusic)await command(call.providerCallId,'playback_start',{playback_content:require('./telephony/hold-music.cjs').holdMusic(),audio_type:'wav',loop:'infinity',target_legs:'self',command_id:require('./telephony/server-dial.cjs').commandId(ref.id,`music-${call.queueCycle || 0}`)});
+  await command(call.providerCallId,'gather',{minimum_digits:1,maximum_digits:1,valid_digits:'12',initial_timeout_millis:30000,timeout_millis:30000,command_id:require('./telephony/server-dial.cjs').commandId(ref.id,`options-${call.queueCycle || 0}`)});
+}
+async function queueAnnouncement(ref,route,eventId) {
+  const call=await db.runTransaction(async tx=>{const c=(await tx.get(ref)).data();if(c?.status!=='queued')return null;tx.update(ref,{queueCycle:(c.queueCycle || 0)+1,lastQueuePromptAt:stamp()});return c;});
+  if(!call)return;
+  if(!openNow(route) || call.queueDeadline?.toMillis()<Date.now())return voicemail(ref,route,'queued');
+  const rows=await ref.parent.where('status','==','queued').limit(500).get();
+  const position=1+rows.docs.filter(d=>d.id!==ref.id && d.data().brandId===call.brandId && (d.data().createdAt?.toMillis() || 0)<(call.createdAt?.toMillis() || 0)).length;
+  await command(call.providerCallId,'playback_stop',{stop:'all'});
+  await command(call.providerCallId,'speak',{payload:`You are caller number ${position} in line. Please continue to hold for the next available ${route.brandName} representative. Press 1 to leave a voicemail, or press 2 to request a callback.`,voice:'female',language:'en-US',client_state:Buffer.from(JSON.stringify({gmsCallId:ref.id,tenantId:route.tenantId,legRole:'caller',prompt:'queue_announcement'})).toString('base64'),command_id:require('./telephony/server-dial.cjs').commandId(ref.id,eventId)});
+}
+async function requestCallback(ref,route) {
+  const current=(await ref.get()).data();if(!/^\+[1-9]\d{7,14}$/.test(current?.destination || ''))return voicemail(ref,route,'queued');
+  const call=await db.runTransaction(async tx=>{const c=(await tx.get(ref)).data();if(c?.status!=='queued')return null;tx.update(ref,{status:'callback_requested'});return c;});if(!call)return;
+  await callbackTask(ref,call,'Caller requested a callback from the inbound queue.');
+  await command(call.providerCallId,'playback_stop',{stop:'all'});
+  await command(call.providerCallId,'speak',{payload:`Thank you. Your callback request has been saved for ${route.brandName}. A representative will return your call. Goodbye.`,voice:'female',language:'en-US',client_state:Buffer.from(JSON.stringify({prompt:'callback_confirmation'})).toString('base64'),command_id:require('./telephony/server-dial.cjs').commandId(ref.id,'callback-confirmation')});
 }
 async function saveRecording(ref,call,recordingId) {
   if(!require('./telephony/readiness.cjs').recordingAllowed(call) || !recordingId)return;
@@ -103,7 +125,9 @@ async function handleInbound({event,payload}) {
       await ref.update({status:'bridging_agent'});
       const conf=call.conferenceId?{id:call.conferenceId}:await provider().conference(call.providerCallId,ref.id);
       await provider().join(conf.id,event.callId);
+      await command(call.providerCallId,'gather_stop').catch(()=>{});
       await command(call.providerCallId,'playback_stop',{stop:'all',command_id:require('./telephony/server-dial.cjs').commandId(ref.id,'queue-music-stop')});
+      await command(call.providerCallId,'speak',{payload:'You are now connected.',voice:'female',language:'en-US',command_id:require('./telephony/server-dial.cjs').commandId(ref.id,'connected-cue')});
       await ref.update({agentCallId:event.callId,conferenceId:conf.id,conferenceStatus:'ready',leadConferenceJoined:true,status:'in_progress'});
       if(require('./telephony/readiness.cjs').recordingAllowed(call)){await provider().record(call.providerCallId,true);await ref.update({recordingStatus:'recording'});}
     }
@@ -118,7 +142,10 @@ async function handleInbound({event,payload}) {
       else {await ref.update({status:'recording_notice'});await command(event.callId,'speak',{payload:`Thank you for calling ${route.brandName}. This call may be recorded for quality assurance and training. Please hold while we connect you with a representative.`,voice:'female',language:'en-US',client_state:Buffer.from(JSON.stringify({gmsCallId:ref.id,tenantId:route.tenantId,legRole:'caller',prompt:'recording_notice'})).toString('base64'),command_id:require('./telephony/server-dial.cjs').commandId(ref.id,'recording-notice')});}
     }
     if(noticeFinished(event,payload,call))await queue(ref,route);
-    if(event.eventType==='call.gather.ended' && call.status==='queued')await voicemail(ref,route,'queued');
+    let prompt;try{prompt=JSON.parse(Buffer.from(payload.client_state || '', 'base64').toString()).prompt;}catch{}
+    if(event.eventType==='call.speak.ended' && payload.status==='completed' && prompt==='queue_announcement' && call.status==='queued')await queueWindow(ref,call);
+    if(event.eventType==='call.speak.ended' && payload.status==='completed' && prompt==='callback_confirmation' && call.status==='callback_requested')await provider().end(event.callId);
+    if(event.eventType==='call.gather.ended' && call.status==='queued'){if(payload.digits==='1')await voicemail(ref,route,'queued');else if(payload.digits==='2')await requestCallback(ref,route);else await queueAnnouncement(ref,route,event.id);}
     if(event.eventType==='call.speak.ended' && call.status==='voicemail_prompt') {
       await ref.update({status:'voicemail',recordingConsent:false,recordingRequested:true,recordingPolicy:'record_all',recordingDisclosurePlayed:true,recordingStatus:'starting'});await db.doc(`gmsCallBindings/${ref.id}`).update({recordingConsent:false,recordingRequested:true,recordingPolicy:'record_all',recordingDisclosurePlayed:true});
       await command(event.callId,'record_start',{format:'wav',channels:'single',play_beep:true,max_length:120,timeout_secs:5,command_id:require('./telephony/server-dial.cjs').commandId(ref.id,'voicemail-record')});
@@ -128,7 +155,7 @@ async function handleInbound({event,payload}) {
       await ref.update({status:'completed',endedAt:stamp(),updatedAt:stamp()});
       if(call.agentCallId)await provider().end(call.agentCallId).catch(()=>{});
       if(call.consultationCallId && call.consultationStatus!=='completed')await provider().end(call.consultationCallId).catch(()=>{});
-      if(!['in_progress','on_hold'].includes(call.status))await callbackTask(ref,call,'Missed inbound call / voicemail.');
+      if(!['in_progress','on_hold','callback_requested'].includes(call.status))await callbackTask(ref,call,'Missed inbound call / voicemail.');
       if(call.leadId){const lr=db.doc(`tenants/${call.tenantId}/leads/${call.leadId}`);await db.runTransaction(async tx=>{const lead=await tx.get(lr);if(lead.data()?.activeCallId===ref.id)tx.update(lr,{activeCallId:null});});}
     }
   }
@@ -143,9 +170,10 @@ exports.inboundCommunications=onCall({enforceAppCheck:false,secrets:[key]},async
     await db.runTransaction(async tx=>{const previous=(await tx.get(ctx.ref)).data() || {};tx.set(ctx.ref,{agentStatus:status,inboundEnabled:enabled===true,presenceUpdatedAt:stamp(),...(previous.agentStatus!==status?{statusChangedAt:stamp()}: {})},{merge:true});tx.set(db.doc(`agentUsers/${ctx.user.uid}`),{agent_status:status,presenceUpdatedAt:stamp()},{merge:true});if(previous.agentStatus!==status)tx.create(db.collection('gmsAgentPresenceEvents').doc(),{tenantId:ctx.tenantId,agentUid:ctx.user.uid,status,previousStatus:previous.agentStatus || 'offline',occurredAt:stamp()});});return {ok:true};
   }
   if(action==='list') {
+    if(request.data.connected===true && ctx.assignment.agentStatus==='available' && ctx.assignment.inboundEnabled===true){await ctx.ref.update({presenceUpdatedAt:stamp()});ctx.assignment.presenceUpdatedAt=Timestamp.now();}
     if(!eligible(ctx.assignment,ctx.route.brandId))return {calls:[]};
-    const rows=await db.collection(`tenants/${ctx.tenantId}/callRecords`).where('status','==','queued').limit(20).get();
-    return {calls:rows.docs.filter(d=>d.data().direction==='inbound' && canClaim(d.data(),ctx.route,ctx.assignment)).map(d=>({callId:d.id,leadId:d.data().leadId,brandName:ctx.route.brandName,callerNumber:d.data().destination,leadMatch:d.data().leadMatch}))};
+    const rows=await db.collection(`tenants/${ctx.tenantId}/callRecords`).where('status','==','queued').limit(500).get();
+    return {calls:rows.docs.filter(d=>d.data().direction==='inbound' && canClaim(d.data(),ctx.route,ctx.assignment)).sort((a,b)=>(a.data().createdAt?.toMillis() || 0)-(b.data().createdAt?.toMillis() || 0)).slice(0,1).map(d=>({callId:d.id,leadId:d.data().leadId,brandName:ctx.route.brandName,callerNumber:d.data().destination,leadMatch:d.data().leadMatch}))};
   }
   if(action==='accept') {
     const ref=db.doc(`tenants/${ctx.tenantId}/callRecords/${id(callId)}`);
