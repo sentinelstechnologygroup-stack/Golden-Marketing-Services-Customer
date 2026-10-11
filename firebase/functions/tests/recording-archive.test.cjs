@@ -20,3 +20,8 @@ test('corrupt backup cannot produce verified evidence',async()=>{
 test('media URL rejects private destinations, redirects and credential-bearing URLs',()=>{
   for(const url of ['http://media.example/a','https://127.0.0.1/a','https://media.example.evil/a','https://user:pass@media.example/a','https://media.example:8443/a']) assert.throws(()=>mediaUrl(url,['media.example']));
 });
+
+test('shared S3 host permits only the Telnyx recorder bucket',()=>{
+ assert.ok(mediaUrl('https://s3.amazonaws.com/telephony-recorder-prod/audio.wav',['s3.amazonaws.com']));
+ assert.throws(()=>mediaUrl('https://s3.amazonaws.com/other-bucket/audio.wav',['s3.amazonaws.com']));
+});

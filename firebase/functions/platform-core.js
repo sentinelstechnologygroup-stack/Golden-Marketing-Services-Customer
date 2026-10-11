@@ -765,7 +765,10 @@ exports.communications = onCall({ enforceAppCheck: true, secrets: [telnyxApiKey]
   // browser token retained after an administrator revokes access.
   request={...request,auth:{...authenticated,token:{...authenticated.token,gmsSuperAdmin:freshUser.customClaims?.gmsSuperAdmin===true}}};
   const { caller, assignment } = await requireAgentAssignment(request, tenantId, roles);
-  const restrictedCallingTest = process.env.TELEPHONY_TEST_ONLY === 'true';
+  const inboundBinding=params.callId ? (await db.doc(`gmsCallBindings/${params.callId}`).get()).data() : null;
+  const inboundConfig=inboundBinding?.direction==='inbound' ? (await db.doc(`tenants/${tenantId}/config/inboundCalling`).get()).data() : null;
+  const inboundControl=Boolean(inboundConfig?.enabled && inboundBinding?.tenantId===tenantId && inboundBinding.agentUid===caller.uid && inboundBinding.brandId===inboundConfig.brandId && inboundBinding.from===inboundConfig.phoneNumber && ['call_status','end_call','hold_call','resume_call','start_consultation','skip_consultation','complete_transfer','cancel_transfer','mute_call'].includes(action));
+  const restrictedCallingTest = process.env.TELEPHONY_TEST_ONLY === 'true' && !inboundControl;
   let callingTestApproval;
   if(restrictedCallingTest) {
     callingTestApproval=(await db.doc(`gmsTestingApprovals/${tenantId}`).get()).data();
@@ -809,7 +812,7 @@ exports.communications = onCall({ enforceAppCheck: true, secrets: [telnyxApiKey]
   }
   if (process.env.TELEPHONY_ENABLED !== 'true') throw new HttpsError('failed-precondition','Calling has not been activated.');
   if (require('./telephony/readiness.cjs').configurationIssues(process.env).length) throw new HttpsError('failed-precondition','Phone-service configuration has not passed activation checks.');
-  if (['warm_transfer','start_consultation','skip_consultation','complete_transfer','cancel_transfer'].includes(action) && process.env.TELEPHONY_WARM_TRANSFER_ENABLED !== 'true' && !conferenceTest) throw new HttpsError('failed-precondition','Warm transfer has not passed end-to-end verification.');
+  if (['warm_transfer','start_consultation','skip_consultation','complete_transfer','cancel_transfer'].includes(action) && process.env.TELEPHONY_WARM_TRANSFER_ENABLED !== 'true' && !conferenceTest && !inboundControl) throw new HttpsError('failed-precondition','Warm transfer has not passed end-to-end verification.');
   let provider;
   try { provider = phoneProvider(); } catch { throw new HttpsError('failed-precondition', 'Phone service is not configured.'); }
   if(action==='browser_session') {
@@ -1061,6 +1064,10 @@ function phoneWebhook(providerName, secrets) {
     if(!valid) return response.status(403).send('Invalid signature');
     const event=normalizeEvent(providerName,request.body || {},rawBody);
     if(!event.callId) return response.status(400).send('Missing call identifier');
+    if(providerName==='telnyx') {
+      try {if(await require('./inbound-calling').handleInbound({event,payload:request.body?.data?.payload || {}}))return response.status(200).send('Accepted');}
+      catch(error){console.error('Inbound event requires reconciliation',{providerStatus:error.providerStatus || null,eventType:event.eventType});return response.status(503).send('Inbound event requires reconciliation');}
+    }
     if(providerName==='telnyx' && event.legRole==='agent') {
       try {
         await require('./telephony/agent-leg.cjs').handleAgentLeg({db,event,connectionId:process.env.TELNYX_CONNECTION_ID,provider:phoneProvider(),callbackUrl:process.env.TELEPHONY_STATUS_URL,enabled:process.env.TELEPHONY_ENABLED==='true'});

@@ -9,7 +9,8 @@ function allowsEvidence(user,membership,assignment,call) {
   if(membership?.active===true && ['client','customer','client_admin','admin','client_supervisor','supervisor','auditor'].includes(membership.role)) {
     return !membership.brandIds?.length || membership.brandIds.includes(call.brandId);
   }
-  if(assignment?.status!=='active'||assignment.role!=='agent'||call.agentUid!==user.uid) return false;
+  if(assignment?.status!=='active'||!['agent','supervisor'].includes(assignment.role)
+    || (call.agentUid!==user.uid && !(call.direction==='inbound' && !call.agentUid) && assignment.role!=='supervisor')) return false;
   const brands=[assignment.brandId,...(assignment.brandIds || [])].filter(Boolean);
   return brands.length>0 && brands.includes(call.brandId);
 }

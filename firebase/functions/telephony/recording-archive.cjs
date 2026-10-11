@@ -11,7 +11,8 @@ function recordingIdentity(value) {
 // credentials or arbitrary webhook URLs may turn this worker into an HTTP proxy.
 function mediaUrl(value, hosts) {
   const url = new URL(value);
-  if (url.protocol !== 'https:' || url.username || url.password || url.port || !hosts.includes(url.hostname)) {
+  if (url.protocol !== 'https:' || url.username || url.password || url.port || !hosts.includes(url.hostname)
+    || (url.hostname==='s3.amazonaws.com' && !url.pathname.startsWith('/telephony-recorder-prod/'))) {
     throw new Error('Unapproved recording media host.');
   }
   return url.href;

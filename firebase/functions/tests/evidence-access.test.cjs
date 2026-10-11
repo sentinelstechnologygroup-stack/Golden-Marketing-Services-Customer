@@ -17,3 +17,12 @@ test('recording downloads require trusted immutable attribution and two verified
  assert.equal(trustedEvidence({...evidence,backupVerified:false},binding,'tenant','call','recording'),false);
  assert.equal(trustedEvidence({...evidence,agentUid:'foreign'},binding,'tenant','call','recording'),false);
 });
+
+test('inbound unclaimed evidence stays within assigned brands',()=>{
+ const user={uid:'agent'},assignment={status:'active',role:'agent',brandIds:['gcr']};
+ const call={direction:'inbound',brandId:'gcr',agentUid:null};
+ assert.equal(allowsEvidence(user,null,assignment,call),true);
+ assert.equal(allowsEvidence(user,null,assignment,{...call,brandId:'foreign'}),false);
+ assert.equal(allowsEvidence(user,null,assignment,{...call,direction:'outbound'}),false);
+ assert.equal(allowsEvidence(user,null,{...assignment,status:'inactive'},call),false);
+});
