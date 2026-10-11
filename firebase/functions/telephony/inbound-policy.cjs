@@ -17,3 +17,13 @@ function canClaim(call,route,assignment,now=Date.now()) {
     && call.queueDeadline?.toMillis?.()>now && eligible(assignment,call.brandId,now);
 }
 module.exports={openNow,eligible,id,canClaim};
+
+function canFallback(call,expectedStatus) {
+ return Boolean(call && (!expectedStatus || call.status===expectedStatus) && !['completed','voicemail','in_progress','on_hold','voicemail_prompt','bridging_agent'].includes(call.status));
+}
+function ownsEvent(mapping,event) {
+ const lifecycle=['call.initiated','call.answered','call.hangup'].includes(event.eventType);
+ return !((lifecycle || event.connectionId) && mapping.connectionId!==event.connectionId || (lifecycle || event.from) && mapping.from!==String(event.from || '') || (lifecycle || event.to) && mapping.to!==event.to);
+}
+module.exports.canFallback=canFallback;
+module.exports.ownsEvent=ownsEvent;

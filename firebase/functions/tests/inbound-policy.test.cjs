@@ -23,3 +23,18 @@ test('only pending, unexpired offers can be claimed; accepted calls cannot be cl
  assert.equal(canClaim(call,{...route,enabled:false},assignment,now),false);
  assert.equal(canClaim({...call,queueDeadline:{toMillis:()=>now-1}},route,assignment,now),false);
 });
+
+test('stale queue timeout cannot move an accepted or connected caller to voicemail',()=>{
+ const {canFallback}=require('../telephony/inbound-policy.cjs');
+ assert.equal(canFallback({status:'queued'},'queued'),true);
+ for(const status of ['dialing_agent','bridging_agent','in_progress','on_hold','completed'])assert.equal(canFallback({status},'queued'),false);
+ assert.equal(canFallback({status:'dialing_agent'},'dialing_agent'),true);
+});
+test('signed auxiliary events may omit addresses but may not contradict bound ownership',()=>{
+ const {ownsEvent}=require('../telephony/inbound-policy.cjs');
+ const mapping={connectionId:'connection',from:'from',to:'to'};
+ assert.equal(ownsEvent(mapping,{eventType:'conference.participant.joined'}),true);
+ assert.equal(ownsEvent(mapping,{eventType:'call.recording.saved',connectionId:'foreign'}),false);
+ assert.equal(ownsEvent(mapping,{eventType:'call.answered'}),false);
+ assert.equal(ownsEvent(mapping,{eventType:'call.answered',...mapping}),true);
+});
