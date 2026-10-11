@@ -859,7 +859,8 @@ exports.communications = onCall({ enforceAppCheck: true, secrets: [telnyxApiKey]
       const onboarding=(await db.doc(`tenants/${tenantId}/config/onboarding`).get()).data()?.data;
       const rotation=(await db.doc(`tenants/${tenantId}/config/handoffRotation`).get()).data();
       let routing;
-      try{routing=require('./client-call-tree.cjs').plan(onboarding || {},rotation?.cursor || 0,call.destination);}catch{throw new HttpsError('failed-precondition','The client handoff call tree needs a valid recipient phone number.');}
+      const testTree=call.direction==='inbound' && inboundConfig?.testHandoffOrder?.enabled && inboundConfig.testHandoffOrder.operatorUids?.includes(caller.uid) ? inboundConfig.testHandoffOrder.callTree : null;
+      try{routing=require('./client-call-tree.cjs').plan(testTree?{callTree:testTree}:onboarding || {},testTree?0:rotation?.cursor || 0,testTree?undefined:call.destination);}catch{throw new HttpsError('failed-precondition','The client handoff call tree needs a valid recipient phone number.');}
       if(restrictedCallingTest)routing.recipients=routing.recipients.filter(r=>Object.values(callingTestApproval.testCallingDestinations || {}).includes(r.phone));
       if(!routing.recipients.length)throw new HttpsError('failed-precondition','No available recipient in the client handoff call tree. Set a callback plan.');
       const contact=routing.recipients[0];

@@ -6,7 +6,7 @@ const {defineSecret}=require('firebase-functions/params');
 const {getFirestore,FieldValue,Timestamp}=require('firebase-admin/firestore');
 const {getAuth}=require('firebase-admin/auth');
 const {createProvider}=require('./telephony/providers.cjs');
-const {openNow,eligible,id,canClaim,canFallback,ownsEvent}=require('./telephony/inbound-policy.cjs');
+const {openNow,eligible,id,canClaim,canFallback,ownsEvent,noticeFinished}=require('./telephony/inbound-policy.cjs');
 const key=defineSecret('TELNYX_API_KEY');
 const db=getFirestore();
 const digest=value=>crypto.createHash('sha256').update(value).digest('hex');
@@ -47,14 +47,18 @@ async function voicemail(ref,route,expectedStatus) {
   if(!reserved)return;
   await callbackTask(ref,reserved,'Caller reached voicemail.');
   if(reserved.agentCallId)await provider().end(reserved.agentCallId).catch(()=>{});
+  await command(reserved.providerCallId,'playback_stop',{stop:'all'}).catch(()=>{});
   await command(reserved.providerCallId,'speak',{payload:`Thank you for calling ${route.brandName}. Our team is unavailable. This call may be recorded for quality assurance and training. Please leave your name, callback number, and reason for calling after the tone.`,voice:'female',language:'en-US',command_id:require('./telephony/server-dial.cjs').commandId(ref.id,'voicemail-prompt')});
 }
-async function queue(ref,route,recordingConsent=false) {
-  const call=(await ref.get()).data();
-  if(!openNow(route))return voicemail(ref,route);
-  await ref.update({status:'queued',recordingConsent,recordingRequested:true,recordingPolicy:'record_all',recordingDisclosurePlayed:true,queueDeadline:Timestamp.fromMillis(Date.now()+45000),updatedAt:stamp()});
-  await db.doc(`gmsCallBindings/${ref.id}`).update({recordingConsent,recordingRequested:true,recordingPolicy:'record_all',recordingDisclosurePlayed:true});
-  await command(call.providerCallId,'gather_using_speak',{payload:`Thank you. Please hold while we connect you with a ${route.brandName} representative. To leave a message instead, press 2.`,voice:'female',language:'en-US',minimum_digits:1,maximum_digits:1,valid_digits:'2',maximum_tries:1,timeout_millis:45000,command_id:require('./telephony/server-dial.cjs').commandId(ref.id,'queue-greeting')});
+async function queue(ref,route) {
+  if(!openNow(route))return voicemail(ref,route,'recording_notice');
+  const call=await db.runTransaction(async tx=>{const value=(await tx.get(ref)).data();if(!value || !['recording_notice','starting_queue'].includes(value.status))return null;tx.update(ref,{status:'starting_queue',recordingRequested:true,recordingPolicy:'record_all',recordingDisclosurePlayed:true});return value;});
+  if(!call)return;
+  const conf=call.conferenceId?{id:call.conferenceId}:await provider().conference(call.providerCallId,ref.id);
+  await ref.update({conferenceId:conf.id,conferenceStatus:'waiting_for_agent'});
+  await db.doc(`gmsCallBindings/${ref.id}`).update({recordingRequested:true,recordingPolicy:'record_all',recordingDisclosurePlayed:true});
+  await command(call.providerCallId,'playback_start',{playback_content:require('./telephony/hold-music.cjs').holdMusic(),audio_type:'wav',loop:'infinity',target_legs:'self',command_id:require('./telephony/server-dial.cjs').commandId(ref.id,'queue-music')});
+  await ref.update({status:'queued',queueDeadline:Timestamp.fromMillis(Date.now()+45000),updatedAt:stamp()});
 }
 async function saveRecording(ref,call,recordingId) {
   if(!require('./telephony/readiness.cjs').recordingAllowed(call) || !recordingId)return;
@@ -97,8 +101,9 @@ async function handleInbound({event,payload}) {
   if(mapping.role==='agent') {
     if(event.answered && ['dialing_agent','bridging_agent'].includes(call.status)) {
       await ref.update({status:'bridging_agent'});
-      try{await command(call.providerCallId,'gather_stop');}catch(error){if(error.providerStatus!==422)throw error;}
-      const conf=await provider().conference(event.callId,ref.id);await provider().join(conf.id,call.providerCallId);
+      const conf=call.conferenceId?{id:call.conferenceId}:await provider().conference(call.providerCallId,ref.id);
+      await provider().join(conf.id,event.callId);
+      await command(call.providerCallId,'playback_stop',{stop:'all',command_id:require('./telephony/server-dial.cjs').commandId(ref.id,'queue-music-stop')});
       await ref.update({agentCallId:event.callId,conferenceId:conf.id,conferenceStatus:'ready',leadConferenceJoined:true,status:'in_progress'});
       if(require('./telephony/readiness.cjs').recordingAllowed(call)){await provider().record(call.providerCallId,true);await ref.update({recordingStatus:'recording'});}
     }
@@ -110,9 +115,9 @@ async function handleInbound({event,payload}) {
     if(event.eventType==='call.initiated' && call.status==='answering')await provider().answer(event.callId);
     if(event.answered && call.status==='answering') {
       if(!openNow(route))await voicemail(ref,route);
-      else {await ref.update({status:'recording_notice'});await command(event.callId,'speak',{payload:`Thank you for calling ${route.brandName}. This call may be recorded for quality assurance and training. Please hold while we connect you with a representative.`,voice:'female',language:'en-US',command_id:require('./telephony/server-dial.cjs').commandId(ref.id,'recording-notice')});}
+      else {await ref.update({status:'recording_notice'});await command(event.callId,'speak',{payload:`Thank you for calling ${route.brandName}. This call may be recorded for quality assurance and training. Please hold while we connect you with a representative.`,voice:'female',language:'en-US',client_state:Buffer.from(JSON.stringify({gmsCallId:ref.id,tenantId:route.tenantId,legRole:'caller',prompt:'recording_notice'})).toString('base64'),command_id:require('./telephony/server-dial.cjs').commandId(ref.id,'recording-notice')});}
     }
-    if(event.eventType==='call.speak.ended' && call.status==='recording_notice')await queue(ref,route);
+    if(noticeFinished(event,payload,call))await queue(ref,route);
     if(event.eventType==='call.gather.ended' && call.status==='queued')await voicemail(ref,route,'queued');
     if(event.eventType==='call.speak.ended' && call.status==='voicemail_prompt') {
       await ref.update({status:'voicemail',recordingConsent:false,recordingRequested:true,recordingPolicy:'record_all',recordingDisclosurePlayed:true,recordingStatus:'starting'});await db.doc(`gmsCallBindings/${ref.id}`).update({recordingConsent:false,recordingRequested:true,recordingPolicy:'record_all',recordingDisclosurePlayed:true});

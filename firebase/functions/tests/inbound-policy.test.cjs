@@ -38,3 +38,22 @@ test('signed auxiliary events may omit addresses but may not contradict bound ow
  assert.equal(ownsEvent(mapping,{eventType:'call.answered'}),false);
  assert.equal(ownsEvent(mapping,{eventType:'call.answered',...mapping}),true);
 });
+
+test('music buffer is a short original mono WAV suitable for inline provider playback',()=>{
+ const {holdMusic}=require('../telephony/hold-music.cjs');const audio=Buffer.from(holdMusic(),'base64');
+ assert.equal(audio.toString('ascii',0,4),'RIFF');assert.equal(audio.toString('ascii',8,12),'WAVE');assert.equal(audio.readUInt32LE(24),8000);assert.equal(audio.readUInt16LE(22),1);assert.ok(audio.length<1000000);
+});
+
+test('agent offering waits for the exact recording notice to complete',()=>{
+ const {noticeFinished}=require('../telephony/inbound-policy.cjs');const event={eventType:'call.speak.ended'},call={status:'recording_notice'},payload={status:'completed',client_state:Buffer.from(JSON.stringify({prompt:'recording_notice'})).toString('base64')};
+ assert.equal(noticeFinished(event,payload,call),true);
+ for(const status of ['call_hangup','cancelled_amd',undefined])assert.equal(noticeFinished(event,{...payload,status},call),false);
+ assert.equal(noticeFinished({...event,eventType:'call.speak.started'},payload,call),false);
+ assert.equal(noticeFinished(event,{...payload,client_state:Buffer.from(JSON.stringify({prompt:'voicemail'})).toString('base64')},call),false);
+ assert.equal(noticeFinished(event,payload,{status:'in_progress'}),false);
+});
+test('approved same-mobile test handoffs retain Patrick first and Jonathan backup',()=>{
+ const {plan}=require('../client-call-tree.cjs');const data={callTree:{mode:'fixed',recipients:[{id:'patrick',name:'Patrick',phone:'+12532226335'},{id:'jonathan',name:'Jonathan',phone:'+19365370568'}]}};
+ assert.deepEqual(plan(data,0,undefined).recipients.map(r=>r.id),['patrick','jonathan']);
+ assert.deepEqual(plan(data,0,'+12532226335').recipients.map(r=>r.id),['jonathan']);
+});

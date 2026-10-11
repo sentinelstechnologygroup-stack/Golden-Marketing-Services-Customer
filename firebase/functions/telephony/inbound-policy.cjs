@@ -27,3 +27,9 @@ function ownsEvent(mapping,event) {
 }
 module.exports.canFallback=canFallback;
 module.exports.ownsEvent=ownsEvent;
+
+function noticeFinished(event,payload,call){
+ if(event.eventType!=='call.speak.ended' || payload.status!=='completed' || !['recording_notice','starting_queue'].includes(call.status))return false;
+ try{return JSON.parse(Buffer.from(payload.client_state || '', 'base64').toString()).prompt==='recording_notice';}catch{return false;}
+}
+module.exports.noticeFinished=noticeFinished;
