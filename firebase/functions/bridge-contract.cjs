@@ -56,6 +56,7 @@ function canonicalLead(route, payload, assignedTo = null, clientContact = null) 
     pageUrl: text(payload.pageUrl, 1000),
     attribution: payload.attribution && typeof payload.attribution === 'object' ? payload.attribution : {},
     consent: payload.consent && typeof payload.consent === 'object' ? payload.consent : {},
+    communicationPreferences: { weeklyListingEmails: require('./listing-email-policy.cjs').listingEmailPreference(payload, payload.submittedAt || null) },
     status: 'new',
     lead_status: 'new',
     qualificationStatus: 'pending',

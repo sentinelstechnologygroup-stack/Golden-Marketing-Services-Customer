@@ -27,6 +27,8 @@ async function persistWebsiteLead({db,routeKey,route,leadRef,lead,idempotencyKey
     if ((limit?.data()?.count || 0) >= 5) throw failure('intake-throttled');
     const now = FieldValue.serverTimestamp();
     tx.create(leadRef,{...lead,receivedAt:now,createdAt:now,updatedAt:now,createdBy:'server:website-ingestion'});
+    const weekly = lead.communicationPreferences?.weeklyListingEmails;
+    if (weekly?.presented) require('./listing-email-policy.cjs').recordPreferenceAndTask({tx,root,leadId:leadRef.id,lead,input:{weeklyListingPreferencePresented:true,weeklyListingEmailsRequested:weekly.requested},stamp:now});
     if (receipt) tx.create(receipt,{leadId:leadRef.id,fingerprint:digest,routeKey,createdAt:now});
     if (rate) tx.set(rate,{count:(limit?.data()?.count || 0)+1,expiresAt:new Date(Date.now()+86400000)});
     tx.create(root.collection('auditLogs').doc(),{tenantId:route.tenantId,actorUid:'server:website-ingestion',action:'lead.ingested',target:leadRef.id,metadata:{brandId:route.brandId,routeKey,assignedTo:lead.assignedTo},occurredAt:now,createdAt:now});
