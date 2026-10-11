@@ -13,7 +13,8 @@ exports.archiveTelnyxRecording = onDocumentCreated({
   if(!job) throw new Error('Archive job is unavailable.');
   // Firestore can redeliver a creation event after a successful archive. Never
   // fetch a deleted provider copy or reset completed transcript/scorecard state.
-  if(job.status==='archived') return;
+  const cleanup=()=>require('./telephony/provider-recording-cleanup.cjs').cleanupArchivedRecording({db,storage:getStorage(),jobRef:event.data.ref,job,token:key.value(),primaryBucket:process.env.GMS_RECORDING_BUCKET,backupBucket:process.env.GMS_RECORDING_BACKUP_BUCKET});
+  if(job.status==='archived'){await cleanup();return;}
   if(!/^tenants\/[A-Za-z0-9_-]+\/callRecords\/[A-Za-z0-9_-]+$/.test(job.callPath || '')) throw new Error('Invalid archive job.');
   const callRef=db.doc(job.callPath), savedCall=(await callRef.get()).data();
   const binding=(await db.doc(`gmsCallBindings/${callRef.id}`).get()).data();
@@ -47,6 +48,7 @@ exports.archiveTelnyxRecording = onDocumentCreated({
       status:Array.isArray(binding.qualificationRubric) && binding.qualificationRubric.length?'pending':'qualification_rubric_required',
       createdAt:FieldValue.serverTimestamp()});
   });
-  // Provider deletion is deliberately separate from archive success. It must also
-  // respect retention/hold policy and transcription completion before activation.
+  // The approved GMS archive is the durable source for later transcription.
+  // Provider cleanup rechecks both independent audio copies and retention holds.
+  await cleanup();
 });

@@ -19,6 +19,7 @@ async function authorized(request) {
 exports.getGmsCallEvidence=onCall({enforceAppCheck:true,maxInstances:2},async request=>{
   const context=await authorized(request);
   const records=await context.ref.collection('recordingEvidence').limit(40).get();
+  if(request.data?.markListened===true){if(context.call.callKind!=='voicemail' && !(context.call.direction==='inbound' && !context.call.agentUid))throw new HttpsError('failed-precondition','Select a voicemail.');if(!records.docs.some(d=>trustedEvidence(d.data(),context.binding,context.tenantId,context.callId,d.id)))throw new HttpsError('failed-precondition','Archived voicemail required.');await db.runTransaction(async tx=>{const call=await tx.get(context.ref);if(!call.data().voicemailListenedAt)tx.update(context.ref,{voicemailListenedAt:FieldValue.serverTimestamp(),voicemailListenedBy:context.user.uid});});}
   const recordings=records.docs.filter(doc=>trustedEvidence(doc.data(),context.binding,context.tenantId,context.callId,doc.id)).map(doc=>{
     const value=doc.data();
     return {id:doc.id,archiveVerified:true,bytes:value.bytes,transcriptStatus:value.transcriptStatus,scorecardStatus:value.scorecardStatus,
