@@ -102,7 +102,9 @@ async function getMembership(tenantId, uid) {
 }
 
 async function requireMembership(request, tenantId, roles = null) {
-  const caller = requireAuth(request);
+  const authenticated = requireAuth(request), currentUser = await auth.getUser(authenticated.uid);
+  if(currentUser.disabled || currentUser.customClaims?.mustChangePassword)throw new HttpsError('permission-denied','Account access is unavailable.');
+  const caller={...authenticated,token:{...authenticated.token,gmsSuperAdmin:currentUser.customClaims?.gmsSuperAdmin===true}};
   if (typeof tenantId !== 'string' || !tenantId.trim()) throw new HttpsError('invalid-argument', 'A tenantId is required.');
   if (caller.token?.gmsSuperAdmin === true) return { caller, membership: { uid: caller.uid, tenantId, role: 'gms_super_admin', active: true } };
   const membership = await getMembership(tenantId, caller.uid);
@@ -111,7 +113,9 @@ async function requireMembership(request, tenantId, roles = null) {
 }
 
 async function requireAgentAssignment(request, tenantId, roles = ['agent', 'client_supervisor', 'client_admin', 'gms_super_admin']) {
-  const caller = requireAuth(request);
+  const authenticated = requireAuth(request), currentUser = await auth.getUser(authenticated.uid);
+  if(currentUser.disabled || currentUser.customClaims?.mustChangePassword)throw new HttpsError('permission-denied','Account access is unavailable.');
+  const caller={...authenticated,token:{...authenticated.token,gmsSuperAdmin:currentUser.customClaims?.gmsSuperAdmin===true}};
   const membership = await getMembership(tenantId, caller.uid);
   if (caller.token?.gmsSuperAdmin === true) return { caller, membership: { uid: caller.uid, tenantId, role: 'gms_super_admin', active: true }, assignment: null };
   if (membership && TENANT_ADMIN_ROLES.includes(normalizeRole(membership.role)) && roleAllowed(membership.role, roles)) return { caller, membership, assignment: null };
