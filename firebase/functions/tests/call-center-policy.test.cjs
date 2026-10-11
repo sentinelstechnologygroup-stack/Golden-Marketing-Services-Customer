@@ -26,3 +26,5 @@ test('failures require accepted connection or explicit transfer outcome; qualifi
  const result=summarize([c('failed',{acceptedAt:base,endedAt:base+5000}),c('transfer',{transferStatus:'exhausted',leadId:'l',tenantId:'t',qualifiedByAgent:true}),c('repeat',{transferStatus:'completed',leadId:'l',tenantId:'t',qualifiedByAgent:true}),c('cancel',{transferStatus:'cancelled'}),c('pending',{transferStatus:'consulting'})],[],base,base+60000);
  assert.equal(result.summary.failedAgentConnections,1);assert.equal(result.summary.failedTransfers,1);assert.equal(result.summary.cancelledTransfers,1);assert.equal(result.summary.pendingTransfers,1);assert.equal(result.summary.qualifiedLeads,1);assert.equal(result.byWeek.length,1);
 });
+
+test('ended incomplete transfers are unresolved, not still pending',()=>{const r=summarize([c('ended',{endedAt:base+1000,transferStatus:'consulting'}),c('waiting',{transferStatus:'consulting'})],[],base,base+60000);assert.equal(r.summary.failedTransfers,1);assert.equal(r.summary.pendingTransfers,1);});
