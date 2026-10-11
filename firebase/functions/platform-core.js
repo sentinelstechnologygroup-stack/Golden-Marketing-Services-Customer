@@ -869,6 +869,7 @@ exports.communications = onCall({ enforceAppCheck: true, secrets: [telnyxApiKey]
     const call = snapshot.data();
     requireAssignmentBrand(assignment,recordBrandId(call));
     if (call.tenantId!==tenantId || call.agentUid!==caller.uid || call.provider!==provider.name) throw new HttpsError('permission-denied','Call ownership or provider mismatch.');
+    if(restrictedCallingTest && (!call.conferenceMode || !callingTestApproval.testCallingLeadIds?.includes(call.leadId) || callingTestApproval.testCallingDestinations?.[call.leadId]!==call.destination || callingTestApproval.testCallerId!==call.from))throw new HttpsError('permission-denied','This handoff is outside the approved conference test.');
     if (!call.conferenceId || !call.agentCallId) throw new HttpsError('failed-precondition','A connected conference is required for handoff controls.');
     if (action==='mute_call') { await provider.mute(call.conferenceId,call.agentCallId,params.muted===true); return {ok:true,callId:callSid,muted:params.muted===true}; }
     if (['start_consultation','skip_consultation','complete_transfer'].includes(action) && call.leadId) {
@@ -887,7 +888,6 @@ exports.communications = onCall({ enforceAppCheck: true, secrets: [telnyxApiKey]
       const contact=routing.recipients[0];
       await db.runTransaction(async tx=>{const saved=(await tx.get(ref)).data();if(saved.consultationCallId || ['starting','consulting','completion_requested'].includes(saved.transferStatus))throw new HttpsError('already-exists','A consultation is already active.');tx.update(ref,{handoffOrder:routing.recipients,handoffIndex:0,handoffRecipientId:contact.id,handoffMode:routing.tree.mode,handoffRingSeconds:routing.tree.ringSeconds,consultationDestination:contact.phone,consultationRequestedAt:FieldValue.serverTimestamp(),consultationStatus:'pending',consultationJoined:false,transferStatus:'starting'});});
       await provider.hold(call.conferenceId,call.providerCallId,true);await require('./telephony/hold-metrics.cjs').holdMetric(db,ref,true);
-    if(restrictedCallingTest && (!call.conferenceMode || !callingTestApproval.testCallingLeadIds?.includes(call.leadId) || callingTestApproval.testCallingDestinations?.[call.leadId]!==call.destination || callingTestApproval.testCallerId!==call.from))throw new HttpsError('permission-denied','This handoff is outside the approved conference test.');
       try {
         const consultation = await provider.start({to:contact.phone,from:call.from,callbackUrl:process.env.TELEPHONY_STATUS_URL,timeoutSeconds:routing.tree.ringSeconds,commandId:crypto.randomUUID(),clientState:require('./telephony/server-dial.cjs').state(callSid,tenantId,'consultation')});
         await ref.update({consultationCallId:consultation.id,transferStatus:'consulting',updatedAt:FieldValue.serverTimestamp()});
@@ -903,6 +903,7 @@ exports.communications = onCall({ enforceAppCheck: true, secrets: [telnyxApiKey]
       return {ok:true,callId:callSid,status:(await ref.get()).data().transferStatus};
     }
     if (action==='cancel_transfer') {
+      await ref.update({transferStatus:'cancelling'});
       if(call.consultationStatus!=='completed')await provider.end(call.consultationCallId); await provider.hold(call.conferenceId,call.providerCallId,false);await require('./telephony/hold-metrics.cjs').holdMetric(db,ref,false);
       await ref.update({consultationCallId:null,consultationJoined:false,consultationStatus:null,transferStatus:'cancelled',updatedAt:FieldValue.serverTimestamp()});
       return {ok:true,callId:callSid,status:'in_progress'};
@@ -915,8 +916,12 @@ exports.communications = onCall({ enforceAppCheck: true, secrets: [telnyxApiKey]
     await provider.end(call.agentCallId);
     await ref.update({transferStatus:'completed',handoffAt:FieldValue.serverTimestamp()});
     await ref.update({transferStatus:'completed',updatedAt:FieldValue.serverTimestamp()});
+    if(call.handoffMode==='rotating'){
+      const tree=(await db.doc(`tenants/${tenantId}/config/onboarding`).get()).data()?.data?.callTree;
+      const index=tree?.recipients?.findIndex(r=>r.id===call.handoffRecipientId) ?? -1;
+      if(index>=0)await db.doc(`tenants/${tenantId}/config/handoffRotation`).set({cursor:(index+1)%tree.recipients.length,updatedAt:FieldValue.serverTimestamp()});
+    }
     await recordAudit({tenantId,actorUid:caller.uid,action:'telephony.complete_transfer_requested',target:callSid});
-      await ref.update({transferStatus:'cancelling'});
     return {ok:true,callId:callSid,status:'transferred'};
   }
   let result;
@@ -929,11 +934,6 @@ exports.communications = onCall({ enforceAppCheck: true, secrets: [telnyxApiKey]
     if (!leadId) throw new HttpsError('invalid-argument', 'An authorized leadId is required.');
     const leadSnapshot = await db.doc(`tenants/${tenantId}/leads/${leadId}`).get();
     if (!leadSnapshot.exists || leadSnapshot.data().tenantId !== tenantId) throw new HttpsError('not-found', 'Lead not found.');
-    if(call.handoffMode==='rotating'){
-      const tree=(await db.doc(`tenants/${tenantId}/config/onboarding`).get()).data()?.data?.callTree;
-      const index=tree?.recipients?.findIndex(r=>r.id===call.handoffRecipientId) ?? -1;
-      if(index>=0)await db.doc(`tenants/${tenantId}/config/handoffRotation`).set({cursor:(index+1)%tree.recipients.length,updatedAt:FieldValue.serverTimestamp()});
-    }
     const leadData = leadSnapshot.data();
     if(!require('./staff-policy.cjs').campaignAllowed(assignment,leadData))throw new HttpsError('permission-denied','Campaign is outside this agent’s workflow.');
     brandId = recordBrandId(leadData);
@@ -1027,6 +1027,8 @@ exports.communications = onCall({ enforceAppCheck: true, secrets: [telnyxApiKey]
     requireAssignmentBrand(assignment, brandId);
     if (callSnapshot.data().provider !== provider.name || callSnapshot.data().agentUid !== caller.uid) throw new HttpsError('permission-denied','Call ownership or provider mismatch.');
     if(!callSnapshot.data().providerCallId && !callSnapshot.data().agentCallId) throw new HttpsError('failed-precondition','The browser call has not connected to the phone service.');
+    if(['completion_requested','completed'].includes(callSnapshot.data().transferStatus))throw new HttpsError('failed-precondition','The handoff has left agent control.');
+    if(callSnapshot.data().consultationCallId)await provider.end(callSnapshot.data().consultationCallId);
     result = await provider.end(callSnapshot.data().providerCallId || callSnapshot.data().agentCallId);
   } else if (action === 'hold_call' || action === 'resume_call') {
     callRef = db.doc(`tenants/${tenantId}/callRecords/${callSid}`);
@@ -1044,8 +1046,6 @@ exports.communications = onCall({ enforceAppCheck: true, secrets: [telnyxApiKey]
   } else {
     callRef = db.doc(`tenants/${tenantId}/callRecords/${callSid}`);
     const callSnapshot = await callRef.get();
-    if(['completion_requested','completed'].includes(callSnapshot.data().transferStatus))throw new HttpsError('failed-precondition','The handoff has left agent control.');
-    if(callSnapshot.data().consultationCallId)await provider.end(callSnapshot.data().consultationCallId);
     if (!callSnapshot.exists || callSnapshot.data().tenantId !== tenantId) throw new HttpsError('not-found', 'Call not found.');
     const callData = callSnapshot.data();
     brandId = recordBrandId(callData);
@@ -1109,6 +1109,7 @@ function phoneWebhook(providerName, secrets) {
         candidate.data().tenantId===event.tenantId && event.connectionId===process.env.TELNYX_CONNECTION_ID &&
         normalizedPhone(event.from)===normalizedPhone(candidate.data().from) && normalizedPhone(event.to)===normalizedPhone(candidate.data().destination)) matches=[candidate];
     }
+    if(!matches.length && event.legRole==='consultation' && /^[A-Za-z0-9_-]{1,120}$/.test(event.tenantId || '') && /^[A-Za-z0-9_-]{1,120}$/.test(event.gmsCallId || '')) {const candidate=await db.doc(`tenants/${event.tenantId}/callRecords/${event.gmsCallId}`).get();if(candidate.exists && candidate.data().consultationDestination===event.to){matches=[candidate];consultation=true;}}
     if(!matches.length) { const other=await db.collectionGroup('callRecords').where('provider','==',providerName).where('consultationCallId','==',event.callId).limit(2).get(); matches=other.docs; consultation=true; }
     if(matches.length!==1) return response.status(202).send('No uniquely mapped call');
     const ref=matches[0].ref;
@@ -1126,7 +1127,6 @@ function phoneWebhook(providerName, secrets) {
       const patch={updatedAt:FieldValue.serverTimestamp()};
       let archiveJob=null, archiveJobRef=null;
       if(!consultation && !current.data().providerCallId && event.callId) patch.providerCallId=event.callId;
-    if(!matches.length && event.legRole==='consultation' && /^[A-Za-z0-9_-]{1,120}$/.test(event.tenantId || '') && /^[A-Za-z0-9_-]{1,120}$/.test(event.gmsCallId || '')) {const candidate=await db.doc(`tenants/${event.tenantId}/callRecords/${event.gmsCallId}`).get();if(candidate.exists && candidate.data().consultationDestination===event.to){matches=[candidate];consultation=true;}}
       if(consultation) { if(current.data().consultationCallId && current.data().consultationCallId!==event.callId)throw new Error('Conflicting consultation identity'); if(event.answered){patch.consultationStatus='answered';patch.consultationCallId=event.callId;} else if(event.status==='completed') patch.consultationStatus='completed'; }
       else if(statusCanAdvance(current.data().status,event.status)) patch.status=event.status;
       if(event.eventType==='call.recording.saved' && event.recordingId && require('./telephony/readiness.cjs').recordingAllowed(callBinding)) {
@@ -1154,6 +1154,14 @@ function phoneWebhook(providerName, secrets) {
       if(archiveJob) tx.create(archiveJobRef,archiveJob);
       tx.update(ref,patch);
     });
+    if(consultation && event.status==='completed')await require('./telephony/handoff-next.cjs').advance({db,ref,provider:phoneProvider(),expectedCallId:event.callId,callbackUrl:process.env.TELEPHONY_STATUS_URL});
+    if(event.answered){
+      const current=(await ref.get()).data();
+      if(current?.conferenceMode && current.conferenceId){
+        try{await phoneProvider().join(current.conferenceId,event.callId);await ref.update(consultation?{consultationJoined:true,transferStatus:'consulting'}:{leadConferenceJoined:true});}
+        catch{return response.status(503).send('Conference join requires reconciliation');}
+      }
+    }
     // Only a signed answered event can trigger recording. Browser state and
     // browser-supplied provider identifiers cannot initiate this operation.
     if(providerName==='telnyx' && event.answered && !consultation && process.env.TELEPHONY_ENABLED==='true') {
@@ -1169,20 +1177,12 @@ function phoneWebhook(providerName, secrets) {
     }
     if(event.status==='completed' && !consultation) {
       const ended=(await ref.get()).data();
+      if(ended?.consultationCallId && ended.consultationStatus!=='completed'){try{await phoneProvider().end(ended.consultationCallId);}catch{await ref.update({consultationCleanup:'needs_reconciliation'});}}
       if(ended?.agentCallId) {
         try {await phoneProvider().end(ended.agentCallId);} catch(error) {if(error.providerStatus!==404 && error.providerStatus!==422) throw error;}
-    if(consultation && event.status==='completed')await require('./telephony/handoff-next.cjs').advance({db,ref,provider:phoneProvider(),expectedCallId:event.callId,callbackUrl:process.env.TELEPHONY_STATUS_URL});
-    if(event.answered){
-      const current=(await ref.get()).data();
-      if(current?.conferenceMode && current.conferenceId){
-        try{await phoneProvider().join(current.conferenceId,event.callId);await ref.update(consultation?{consultationJoined:true,transferStatus:'consulting'}:{leadConferenceJoined:true});}
-        catch{return response.status(503).send('Conference join requires reconciliation');}
-      }
-    }
       }
     }
     return response.status(200).send('Accepted');
   });
 }
 exports.telnyxWebhook=phoneWebhook('telnyx',[telnyxApiKey]);
-      if(ended?.consultationCallId && ended.consultationStatus!=='completed'){try{await phoneProvider().end(ended.consultationCallId);}catch{await ref.update({consultationCleanup:'needs_reconciliation'});}}
