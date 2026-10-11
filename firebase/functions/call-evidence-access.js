@@ -14,12 +14,12 @@ async function authorized(request) {
   ]);
   if(!binding.exists || binding.data().tenantId!==tenantId || !call.exists || call.data().tenantId!==tenantId
     || !allowsEvidence(user,member.data(),assignment.data(),binding.data())) throw new HttpsError('permission-denied','This call evidence is unavailable to your account.');
-  return {tenantId,callId,binding:binding.data(),call:call.data(),ref:call.ref,user};
+  return {tenantId,callId,binding:binding.data(),call:call.data(),ref:call.ref,user,assignment:assignment.data()};
 }
 exports.getGmsCallEvidence=onCall({enforceAppCheck:true,maxInstances:2},async request=>{
   const context=await authorized(request);
   const records=await context.ref.collection('recordingEvidence').limit(40).get();
-  if(request.data?.markListened===true){if(context.call.callKind!=='voicemail' && !(context.call.direction==='inbound' && !context.call.agentUid))throw new HttpsError('failed-precondition','Select a voicemail.');if(!records.docs.some(d=>trustedEvidence(d.data(),context.binding,context.tenantId,context.callId,d.id)))throw new HttpsError('failed-precondition','Archived voicemail required.');await db.runTransaction(async tx=>{const call=await tx.get(context.ref);if(!call.data().voicemailListenedAt)tx.update(context.ref,{voicemailListenedAt:FieldValue.serverTimestamp(),voicemailListenedBy:context.user.uid});});}
+  if(request.data?.markListened===true){if(context.user.customClaims?.gmsSuperAdmin!==true && !(context.assignment?.status==='active' && ['agent','supervisor'].includes(context.assignment.role)))throw new HttpsError('permission-denied','Staff access required to acknowledge a voicemail.');if(context.call.callKind!=='voicemail' && !(context.call.direction==='inbound' && !context.call.agentUid))throw new HttpsError('failed-precondition','Select a voicemail.');if(!records.docs.some(d=>trustedEvidence(d.data(),context.binding,context.tenantId,context.callId,d.id)))throw new HttpsError('failed-precondition','Archived voicemail required.');await db.runTransaction(async tx=>{const call=await tx.get(context.ref);if(!call.data().voicemailListenedAt)tx.update(context.ref,{voicemailListenedAt:FieldValue.serverTimestamp(),voicemailListenedBy:context.user.uid});});}
   const recordings=records.docs.filter(doc=>trustedEvidence(doc.data(),context.binding,context.tenantId,context.callId,doc.id)).map(doc=>{
     const value=doc.data();
     return {id:doc.id,archiveVerified:true,bytes:value.bytes,transcriptStatus:value.transcriptStatus,scorecardStatus:value.scorecardStatus,
