@@ -16,7 +16,7 @@ function recordPreferenceAndTask({tx,root,leadId,lead,input,stamp,source='websit
  tx.set(root.collection('followUpTasks').doc(`weekly-listings-${leadId}`),{
   tenantId:lead.tenantId,brandId:lead.brandId,leadId,assignedTo:lead.assignedTo || null,
   task_type:'weekly_listing_setup',title:'Realtor: configure weekly matching-property emails',
-  status:preference.requested?'pending':'cancelled',requestedAt:stamp,updatedAt:stamp,
+  status:preference.requested?'pending':'cancelled',requestedAt:stamp,dueAt:stamp,updatedAt:stamp,
   isTest:lead.isTest===true,communicationsSuppressed:true,
   notes:preference.requested?'Coordinate manual Realtor setup using the saved search criteria. Confirm the current email preference and provider suppression list. Verify the unsubscribe option works before activating delivery. No alert or email has been sent.':'Weekly listing emails declined. Do not activate alerts; if a provider alert already exists, remove this recipient and confirm suppression.',
  },{merge:true});

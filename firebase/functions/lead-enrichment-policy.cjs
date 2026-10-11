@@ -11,6 +11,7 @@ If no: Stop financing questions. No follow-up pressure.
 Missing pre-qualification, an unknown/declined amount, not working with a lender, or declining a referral never disqualifies this inquiry. No lender approval or financing eligibility is certified by the phone agent.`;
 const WEEKLY_EMAIL_LABEL = 'Send me a weekly email with newly listed homes that match my search preferences. I can unsubscribe at any time.';
 const WEEKLY_EMAIL_PROTOCOL = `STEP 3 — OPTIONAL WEEKLY LISTING EMAILS
+The website and phone-agent handoff review share one saved preference. Honor existing unsubscribes; reload if the preference changed while it was being reviewed.
 Present the weekly listing-email checkbox selected by default, with this label: "${WEEKLY_EMAIL_LABEL}"
 The prospect can clear the checkbox without affecting their inquiry, qualification, referral or Realtor handoff.
 Record the actual submitted/confirmed preference, its wording/version, time and source. Do not enroll a prospect who was never shown or asked the preference, who opted out, or whose earlier unsubscribe remains in effect.

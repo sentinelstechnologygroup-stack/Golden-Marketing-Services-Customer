@@ -17,3 +17,5 @@ Object.assign(exports, require('./staff-management'));
 Object.assign(exports, require('./onboarding-delivery'));
 
 Object.assign(exports, require('./inbound-calling'));
+
+Object.assign(exports, require('./lead-supplemental'));

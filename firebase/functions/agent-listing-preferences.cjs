@@ -1,10 +1,11 @@
 const {FieldValue}=require('firebase-admin/firestore');const {HttpsError}=require('firebase-functions/v2/https');
 const {listingEmailPreference,recordPreferenceAndTask}=require('./listing-email-policy.cjs');
-async function saveAgentListingPreference({db,recordRef,patch,callerUid}) {
+async function saveAgentListingPreference({db,recordRef,patch,callerUid,authorizeLead}) {
  const selection=patch.communicationPreferences?.weeklyListingEmails;
  if(!selection || selection.presented!==true || typeof selection.requested!=='boolean' || !Number.isInteger(selection.expectedRevision) || selection.expectedRevision<0)throw new HttpsError('invalid-argument','Record the prospect’s actual weekly email choice.');
  await db.runTransaction(async tx=>{
   const fresh=(await tx.get(recordRef)).data();if(!fresh)throw new HttpsError('not-found','Lead not found.');
+  if(authorizeLead)authorizeLead(fresh);
   const previous=fresh.communicationPreferences?.weeklyListingEmails;
   if((previous?.revision || 0)!==selection.expectedRevision)throw new HttpsError('aborted','The email preference changed. Reload before saving.');
   if(selection.requested && (fresh.doNotContact || fresh.optOut || fresh.emailOptOut || ['unsubscribed','suppressed'].includes(previous?.status)))throw new HttpsError('failed-precondition','An existing unsubscribe must be resolved through the approved resubscription process.');
@@ -14,6 +15,7 @@ async function saveAgentListingPreference({db,recordRef,patch,callerUid}) {
   tx.update(recordRef,{...patch,communicationPreferences:merged,updatedAt:stamp,updatedBy:callerUid});
   recordPreferenceAndTask({tx,root:recordRef.parent.parent,leadId:recordRef.id,lead:fresh,input,stamp,source:'phone_agent'});
   tx.set(recordRef,{communicationPreferences:{weeklyListingEmails:{recordedBy:callerUid}}},{merge:true});
+  tx.create(recordRef.parent.parent.collection('auditLogs').doc(),{tenantId:fresh.tenantId,actorUid:callerUid,action:'lead.weekly_email_preference_saved',target:recordRef.id,occurredAt:stamp,createdAt:stamp});
   patch.communicationPreferences=merged;
  });
 }
