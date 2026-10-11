@@ -33,7 +33,7 @@ async function matchLead(route,caller,callId) {
   const validPhone=/^\+[1-9]\d{7,14}$/.test(caller);
   const rows=validPhone ? await collection.where('phone','==',caller).limit(20).get() : {docs:[]};
   const matches=rows.docs.filter(d=>d.data().brandId===route.brandId);
-  if(matches.length===1)return {leadId:matches[0].id,leadMatch:'caller_number'};
+  if(matches.length===1)return {leadId:matches[0].id,campaignId:matches[0].data().campaignId || null,leadMatch:'caller_number'};
   // Preserve ambiguous existing records. New inquiry is not identity verification.
   const ref=collection.doc(`inbound_${callId}`);
   if(!(await ref.get()).exists)await ref.set({tenantId:route.tenantId,brandId:route.brandId,firstName:'Inbound caller',phone:validPhone?caller:null,status:'new',sourceId:route.sourceId,assignedTo:null,contactAttempts:0,verificationStatus:'pending',qualificationStatus:'pending',lifecycleStage:'inquiry',inboundMatch:matches.length?'ambiguous':'unmatched',candidateLeadIds:matches.map(d=>d.id),createdAt:stamp(),updatedAt:stamp()});
@@ -43,7 +43,7 @@ async function callbackTask(ref,call,reason) {
   await db.doc(`tenants/${call.tenantId}/followUpTasks/inbound_${ref.id}`).set({tenantId:call.tenantId,brandId:call.brandId,leadId:call.leadId,callId:ref.id,task_type:'callback_reminder',status:'pending',title:'Return inbound call',notes:reason,dueAt:stamp(),createdAt:stamp()},{merge:true});
 }
 async function voicemail(ref,route,expectedStatus) {
-  const reserved=await db.runTransaction(async tx=>{const call=(await tx.get(ref)).data();if(!canFallback(call,expectedStatus))return null;tx.update(ref,{status:'voicemail_prompt',callKind:'voicemail',updatedAt:stamp()});return call;});
+  const reserved=await db.runTransaction(async tx=>{const call=(await tx.get(ref)).data();if(!canFallback(call,expectedStatus))return null;tx.update(ref,{status:'voicemail_prompt',callKind:'voicemail',queueExitedAt:stamp(),updatedAt:stamp()});return call;});
   if(!reserved)return;
   await callbackTask(ref,reserved,'Caller reached voicemail.');
   if(reserved.agentCallId)await provider().end(reserved.agentCallId).catch(()=>{});
@@ -60,7 +60,7 @@ async function queue(ref,route) {
   const conf=call.conferenceId?{id:call.conferenceId}:await provider().conference(call.providerCallId,ref.id);
   await ref.update({conferenceId:conf.id,conferenceStatus:'waiting_for_agent'});
   await db.doc(`gmsCallBindings/${ref.id}`).update({recordingRequested:true,recordingPolicy:'record_all',recordingDisclosurePlayed:true});
-  await ref.update({status:'queued',queueDeadline:Timestamp.fromMillis(Date.now()+(route.maxWaitSeconds || 600)*1000),lastQueuePromptAt:stamp(),queueCycle:0,updatedAt:stamp()});
+  await ref.update({status:'queued',queuedAt:stamp(),queueDeadline:Timestamp.fromMillis(Date.now()+(route.maxWaitSeconds || 600)*1000),lastQueuePromptAt:stamp(),queueCycle:0,updatedAt:stamp()});
   await queueWindow(ref,{...call,queueCycle:0});
 }
 async function queueWindow(ref,call,startMusic=true) {
@@ -79,7 +79,7 @@ async function queueAnnouncement(ref,route,eventId) {
 }
 async function requestCallback(ref,route) {
   const current=(await ref.get()).data();if(!/^\+[1-9]\d{7,14}$/.test(current?.destination || ''))return voicemail(ref,route,'queued');
-  const call=await db.runTransaction(async tx=>{const c=(await tx.get(ref)).data();if(c?.status!=='queued')return null;tx.update(ref,{status:'callback_requested'});return c;});if(!call)return;
+  const call=await db.runTransaction(async tx=>{const c=(await tx.get(ref)).data();if(c?.status!=='queued')return null;tx.update(ref,{status:'callback_requested',callbackRequestedAt:stamp(),queueExitedAt:stamp()});return c;});if(!call)return;
   await callbackTask(ref,call,'Caller requested a callback from the inbound queue.');
   await command(call.providerCallId,'playback_stop',{stop:'all'});
   await command(call.providerCallId,'speak',{payload:`Thank you. Your callback request has been saved for ${route.brandName}. A representative will return your call. Goodbye.`,voice:'female',language:'en-US',client_state:Buffer.from(JSON.stringify({prompt:'callback_confirmation'})).toString('base64'),command_id:require('./telephony/server-dial.cjs').commandId(ref.id,'callback-confirmation')});
@@ -104,7 +104,7 @@ async function handleInbound({event,payload}) {
     if(!exists.exists){
       const caller=String(event.from || 'anonymous').slice(0,100),lead=await matchLead(route,caller,callId);
       const batch=db.batch();
-      const call={...lead,tenantId:route.tenantId,brandId:route.brandId,provider:'telnyx',direction:'inbound',from:route.phoneNumber,destination:caller,providerCallId:event.callId,status:'answering',agentUid:null,recordingPolicy:'record_all',recordingConsent:false,recordingRequested:false,conferenceMode:true,createdAt:stamp(),updatedAt:stamp()};
+      const call={...lead,tenantId:route.tenantId,brandId:route.brandId,provider:'telnyx',direction:'inbound',from:route.phoneNumber,destination:caller,providerCallId:event.callId,status:'answering',agentUid:null,recordingPolicy:'record_all',recordingConsent:false,recordingRequested:false,conferenceMode:true,holdSeconds:0,createdAt:stamp(),updatedAt:stamp()};
       batch.create(ref,call);batch.create(db.doc(`gmsCallBindings/${callId}`),{...call,callPath:ref.path});
       mapping={callPath:ref.path,tenantId:route.tenantId,role:'caller',connectionId:event.connectionId,from:String(event.from || ''),to:event.to};batch.create(map,mapping);await batch.commit();
     }else mapping={callPath:ref.path,tenantId:route.tenantId,role:'caller',connectionId:event.connectionId,from:event.from,to:event.to};
@@ -130,7 +130,7 @@ async function handleInbound({event,payload}) {
       await command(call.providerCallId,'gather_stop').catch(()=>{});
       await command(call.providerCallId,'playback_stop',{stop:'all',command_id:require('./telephony/server-dial.cjs').commandId(ref.id,'queue-music-stop')});
       await command(call.providerCallId,'speak',{payload:'You are now connected.',voice:'female',language:'en-US',command_id:require('./telephony/server-dial.cjs').commandId(ref.id,'connected-cue')});
-      await ref.update({agentCallId:event.callId,conferenceId:conf.id,conferenceStatus:'ready',leadConferenceJoined:true,status:'in_progress'});
+      await ref.update({agentCallId:event.callId,conferenceId:conf.id,conferenceStatus:'ready',leadConferenceJoined:true,connectedAt:stamp(),status:'in_progress'});
       if(require('./telephony/readiness.cjs').recordingAllowed(call)){await provider().record(call.providerCallId,true);await ref.update({recordingStatus:'recording'});}
     }
     if(event.status==='completed' && !['completed','completion_requested'].includes(call.transferStatus)) {
@@ -188,7 +188,7 @@ exports.inboundCommunications=onCall({enforceAppCheck:false,secrets:[key]},async
       if(!c || c.direction!=='inbound' || c.brandId!==ctx.route.brandId || !canClaim(c,ctx.route,assignment.data()))throw new HttpsError('already-exists','This call is no longer available.');
       const lr=db.doc(`tenants/${ctx.tenantId}/leads/${c.leadId}`),lead=await tx.get(lr);
       if(lead.data()?.activeCallId)throw new HttpsError('failed-precondition','This lead already has an active call.');
-      tx.update(ref,{status:'dialing_agent',agentUid:ctx.user.uid,agentSipDestination:sip,agentDeadline:Timestamp.fromMillis(Date.now()+25000)});
+      tx.update(ref,{status:'dialing_agent',acceptedAt:stamp(),agentUid:ctx.user.uid,agentSipDestination:sip,agentDeadline:Timestamp.fromMillis(Date.now()+25000)});
       tx.update(ctx.ref,{agentStatus:'busy',statusChangedAt:stamp(),presenceUpdatedAt:stamp()});tx.create(db.collection('gmsAgentPresenceEvents').doc(),{tenantId:ctx.tenantId,agentUid:ctx.user.uid,status:'busy',previousStatus:assignment.data().agentStatus,previousDurationSeconds:assignment.data().statusChangedAt?.toMillis?Math.max(0,Math.floor((Date.now()-assignment.data().statusChangedAt.toMillis())/1000)):null,occurredAt:stamp()});tx.update(lr,{activeCallId:ref.id});tx.update(db.doc(`gmsCallBindings/${ref.id}`),{agentUid:ctx.user.uid,agentSipDestination:sip});return c;
     });
     try {const result=await provider().start({to:sip,from:call.from,callbackUrl:callbackUrl(),timeoutSeconds:20,commandId:require('./telephony/server-dial.cjs').commandId(ref.id,'inbound-agent'),clientState:require('./telephony/server-dial.cjs').state(ref.id,ctx.tenantId,'inbound_agent')});await ref.update({agentCallId:result.id});}

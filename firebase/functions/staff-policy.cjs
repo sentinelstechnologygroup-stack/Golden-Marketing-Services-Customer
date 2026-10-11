@@ -27,3 +27,6 @@ function collectionAllowed(role, collection, write = false) {
   return true;
 }
 module.exports = { PRESETS, input, collectionAllowed };
+
+function campaignAllowed(assignment,record){return !assignment || assignment.campaignAccess!=='selected' || !(record.campaignId || record.campaign_id) || (assignment.campaignIds || []).includes(record.campaignId || record.campaign_id);}
+module.exports.campaignAllowed=campaignAllowed;

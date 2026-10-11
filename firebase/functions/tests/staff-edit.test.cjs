@@ -1,0 +1,19 @@
+const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
+const policy=require('../staff-policy.cjs');
+function fixture({admin=true,busy=false}={}){
+ const store=new Map([['agentUsers/staff',{role:'agent',displayName:'Fixture',status:'active'}],['agentUsers/staff/assignments/client',{tenantId:'client',brandIds:['brand'],status:'active',agentStatus:busy?'busy':'standby',telnyxCredentialId:'keep-private'}],['tenants/client',{name:'Client'}],['tenants/client/brands/brand',{}],['tenants/client/campaigns/campaign',{brandId:'brand'}]]),writes=[],authWrites=[];
+ const snap=path=>({id:path.split('/').at(-1),exists:store.has(path),data:()=>store.get(path),ref:ref(path)});
+ const ref=path=>({path,get:async()=>snap(path),collection:name=>collection(path+'/'+name)});
+ const collection=path=>({where:()=>({limit:()=>({get:async()=>({docs:[]})})}),doc:(id='audit')=>ref(path+'/'+id),get:async()=>({docs:[...store.keys()].filter(k=>k.startsWith(path+'/') && !k.slice(path.length+1).includes('/')).map(snap)})});
+ const db={doc:ref,collection,batch:()=>({set:(r,v)=>writes.push([r.path,v]),create:(r,v)=>writes.push([r.path,v]),commit:async()=>{}})};
+ const auth={getUser:async uid=>({uid,email:'fixture@example.invalid',customClaims:uid==='actor'?{gmsSuperAdmin:admin}:{unrelatedClaim:'preserved'}}),updateUser:async(uid,value)=>authWrites.push(['update',uid,value]),setCustomUserClaims:async(uid,value)=>authWrites.push(['claims',uid,value]),revokeRefreshTokens:async uid=>authWrites.push(['revoke',uid])};
+ class HttpsError extends Error{constructor(code,message){super(message);this.code=code;}}
+ const deps={'firebase-admin/auth':{getAuth:()=>auth},'firebase-admin/firestore':{getFirestore:()=>db,FieldValue:{serverTimestamp:()=>123}},'firebase-functions/v2/https':{onCall:(_,f)=>f,HttpsError},'firebase-functions/params':{defineSecret:()=>({})},'./staff-policy.cjs':policy};
+ const exports={};vm.runInNewContext(fs.readFileSync(require.resolve('../staff-management'),'utf8'),{exports,require:n=>deps[n] || require(n),process:{env:{}}});
+ return {run:data=>exports.updateGmsStaff({auth:{uid:'actor'},data}),writes,authWrites};
+}
+const value={uid:'staff',name:'Fixture employee',email:'fixture@example.invalid',role:'supervisor',status:'active',assignments:[{tenantId:'client',brandIds:['brand'],campaignAccess:'selected',campaignIds:['campaign']}]};
+test('ordinary agent cannot edit staff or promote a role',async()=>{const f=fixture({admin:false});await assert.rejects(f.run(value),e=>e.code==='permission-denied');assert.equal(f.writes.length,0);});
+test('promotion derives authorities, preserves phone credentials and unrelated claims, revokes sessions',async()=>{const f=fixture();await f.run({...value,permissions:['injected']});const a=f.writes.find(([path])=>path==='agentUsers/staff/assignments/client')[1];assert.equal(a.role,'supervisor');assert.equal(a.permissions.includes('injected'),false);assert.equal(a.telnyxCredentialId,undefined);assert.equal(a.campaignAccess,'selected');assert.equal(f.authWrites.find(w=>w[0]==='claims')[2].unrelatedClaim,'preserved');assert.equal(f.authWrites.some(w=>w[0]==='revoke'),true);});
+test('archiving disables login and routing but does not delete evidence',async()=>{const f=fixture();await f.run({...value,status:'archived'});assert.equal(f.authWrites[0][2].disabled,true);const a=f.writes.find(([path])=>path==='agentUsers/staff/assignments/client')[1];assert.equal(a.status,'revoked');assert.equal(a.inboundEnabled,false);assert.equal(a.agentStatus,'offline');});
+test('active-call access reductions and foreign campaign assignments are rejected',async()=>{await assert.rejects(fixture({busy:true}).run(value),e=>e.code==='failed-precondition');await assert.rejects(fixture().run({...value,assignments:[{tenantId:'client',brandIds:['brand'],campaignAccess:'selected',campaignIds:['other']}]}),e=>e.code==='invalid-argument');});

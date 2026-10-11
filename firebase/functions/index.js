@@ -19,3 +19,5 @@ Object.assign(exports, require('./onboarding-delivery'));
 Object.assign(exports, require('./inbound-calling'));
 
 Object.assign(exports, require('./lead-supplemental'));
+
+Object.assign(exports, require('./call-center'));

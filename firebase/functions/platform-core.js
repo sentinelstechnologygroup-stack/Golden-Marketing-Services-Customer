@@ -597,9 +597,14 @@ exports.getAgentCollection = onCall({ enforceAppCheck: false }, async (request) 
   if (assignment && !require('./staff-policy.cjs').collectionAllowed(assignment.role, collectionName)) throw new HttpsError('permission-denied', 'This collection is outside your job role.');
   const pageSize = Math.min(Math.max(Number(requestedLimit) || 200, 1), 500);
   const snapshot = await db.collection(`tenants/${tenantId}/${collectionName}`).where('tenantId', '==', tenantId).limit(pageSize).get();
-  const rows = snapshot.docs
+  let rows = snapshot.docs
     .map((item) => ({ id: item.id, ...item.data() }))
-    .filter((item) => item.archived !== true && assignmentAllowsBrand(assignment, recordBrandId(item)));
+    .filter((item) => item.archived !== true && assignmentAllowsBrand(assignment, recordBrandId(item)))
+    .filter(item=>!['leads','campaigns','followUpTasks','appointments'].includes(collectionName) || require('./staff-policy.cjs').campaignAllowed(assignment,collectionName==='campaigns'?{campaignId:item.id}:item));
+  if(assignment?.campaignAccess==='selected' && ['followUpTasks','appointments','communicationAlerts','callRecords'].includes(collectionName)){
+    const ids=[...new Set(rows.map(r=>r.leadId || r.lead_id).filter(Boolean))];const permitted=new Map(await Promise.all(ids.map(async id=>{const lead=(await db.doc(`tenants/${tenantId}/leads/${id}`).get()).data();return [id,Boolean(lead && require('./staff-policy.cjs').campaignAllowed(assignment,lead))];})));
+    rows=rows.filter(r=>!(r.leadId || r.lead_id) || permitted.get(r.leadId || r.lead_id));
+  }
   return { rows };
 });
 
@@ -630,12 +635,13 @@ exports.updateAgentRecord = onCall({ enforceAppCheck: true }, async (request) =>
   if (!current.exists || current.data().tenantId !== tenantId) throw new HttpsError('not-found', 'Record not found.');
   if (current.data().managedBy === 'onboarding') throw new HttpsError('failed-precondition', 'Update this configuration in Agent Portal > Clients > onboarding.');
   requireAssignmentBrand(assignment, recordBrandId(current.data()));
+  if(collectionName==='leads' && !require('./staff-policy.cjs').campaignAllowed(assignment,current.data()))throw new HttpsError('permission-denied','Campaign is outside this agent’s workflow.');
   const patch = stripImmutablePatch(data);
   if (assignment?.role === 'agent' && collectionName === 'leads' && Object.hasOwn(patch, 'assignedTo') && patch.assignedTo !== current.data().assignedTo) throw new HttpsError('permission-denied', 'A supervisor must reassign leads.');
   if(['callTranscripts','callQualityReviews'].includes(collectionName) &&
     (current.data().aiGenerated===true || current.data().managedBy==='recording_worker' || patch.aiGenerated===true || patch.managedBy==='recording_worker')) throw new HttpsError('permission-denied','AI evidence is managed by the backend. Add a separate human review.');
   if (collectionName === 'callRecords' && current.data().provider === 'telnyx') {
-    const protectedFields = ['transferStatus','handoffRecipientId','handoffAt','consultationStatus','consultationJoined','consultationCallId','conferenceId','handoffOrder','handoffIndex', 'provider', 'providerCallId', 'agentCallId', 'agentUid', 'agentId', 'leadId', 'from', 'destination', 'direction', 'status', 'agentLegStatus', 'leadDialStatus', 'recordingPolicy', 'recordingConsent', 'recordingRequested', 'recordingStatus', 'recordingStoragePath', 'startedAt', 'endedAt'];
+    const protectedFields = ['transferStatus','handoffRecipientId','handoffAt','consultationStatus','consultationJoined','consultationCallId','conferenceId','handoffOrder','handoffIndex', 'queueExitedAt','queuedAt','acceptedAt','connectedAt','holdSeconds','holdStartedAt','provider', 'providerCallId', 'agentCallId', 'agentUid', 'agentId', 'leadId', 'from', 'destination', 'direction', 'status', 'agentLegStatus', 'leadDialStatus', 'recordingPolicy', 'recordingConsent', 'recordingRequested', 'recordingStatus', 'recordingStoragePath', 'startedAt', 'endedAt'];
     if (Object.keys(patch).some(field => protectedFields.includes(field) || field.startsWith('recording') || field.startsWith('provider'))) {
       throw new HttpsError('permission-denied', 'Calling and recording evidence are managed by the backend.');
     }
@@ -704,6 +710,7 @@ exports.transitionLead = onCall({ enforceAppCheck: true }, async (request) => {
     const snapshot = await transaction.get(leadRef);
     if (!snapshot.exists || snapshot.data().tenantId !== tenantId) throw new HttpsError('not-found', 'Lead not found.');
     requireAssignmentBrand(assignment, recordBrandId(snapshot.data()));
+    if(!require('./staff-policy.cjs').campaignAllowed(assignment,snapshot.data()))throw new HttpsError('permission-denied','Campaign is outside this agent’s workflow.');
     const patch = { status, lead_status: status, updatedAt: FieldValue.serverTimestamp(), updatedBy: caller.uid };
     if (disposition !== null) patch.disposition = String(disposition).slice(0, 500);
     if (note !== null) patch.latestNote = String(note).slice(0, 2000);
@@ -731,6 +738,7 @@ exports.appointmentWorkflow = onCall({ enforceAppCheck: true }, async (request) 
       const lead = await transaction.get(leadRef);
       if (!lead.exists || lead.data().tenantId !== tenantId) throw new HttpsError('not-found', 'Lead not found.');
       const leadData = lead.data();
+      if(!require('./staff-policy.cjs').campaignAllowed(assignment,leadData))throw new HttpsError('permission-denied','Campaign is outside this agent’s workflow.');
       const brandId = recordBrandId(leadData);
       requireAssignmentBrand(assignment, brandId);
       const record = {
@@ -748,6 +756,7 @@ exports.appointmentWorkflow = onCall({ enforceAppCheck: true }, async (request) 
     const snapshot = await ref.get();
     if (!snapshot.exists || snapshot.data().tenantId !== tenantId) throw new HttpsError('not-found', 'Appointment not found.');
     requireAssignmentBrand(assignment, recordBrandId(snapshot.data()));
+    if(!require('./staff-policy.cjs').campaignAllowed(assignment,snapshot.data()))throw new HttpsError('permission-denied','Campaign is outside this agent’s workflow.');
     const status = action === 'confirm' ? 'confirmed' : action === 'reschedule' ? 'booked' : action === 'cancel' ? 'canceled' : String(data.status || 'completed');
     const patch = { ...stripImmutablePatch(data), status, updatedAt: FieldValue.serverTimestamp(), updatedBy: caller.uid };
     await ref.update(patch);
@@ -804,6 +813,7 @@ exports.communications = onCall({ enforceAppCheck: true, secrets: [telnyxApiKey]
       const snapshot = await tx.get(ref);
       if (!snapshot.exists || snapshot.data().tenantId!==tenantId) throw new HttpsError('not-found','Lead not found.');
       const lead = snapshot.data(); requireAssignmentBrand(assignment,recordBrandId(lead));
+      if(!require('./staff-policy.cjs').campaignAllowed(assignment,lead))throw new HttpsError('permission-denied','Campaign is outside this agent’s workflow.');
       const owner = lead.queueOwnerUid;
       const expires = lead.queueLeaseExpiresAt?.toMillis?.() || 0;
       if (owner && owner!==caller.uid && expires>Date.now()) throw new HttpsError('already-exists','Another agent accepted this request.');
@@ -865,12 +875,12 @@ exports.communications = onCall({ enforceAppCheck: true, secrets: [telnyxApiKey]
       if(!routing.recipients.length)throw new HttpsError('failed-precondition','No available recipient in the client handoff call tree. Set a callback plan.');
       const contact=routing.recipients[0];
       await db.runTransaction(async tx=>{const saved=(await tx.get(ref)).data();if(saved.consultationCallId || ['starting','consulting','completion_requested'].includes(saved.transferStatus))throw new HttpsError('already-exists','A consultation is already active.');tx.update(ref,{handoffOrder:routing.recipients,handoffIndex:0,handoffRecipientId:contact.id,handoffMode:routing.tree.mode,handoffRingSeconds:routing.tree.ringSeconds,consultationDestination:contact.phone,consultationRequestedAt:FieldValue.serverTimestamp(),consultationStatus:'pending',consultationJoined:false,transferStatus:'starting'});});
-      await provider.hold(call.conferenceId,call.providerCallId,true);
+      await provider.hold(call.conferenceId,call.providerCallId,true);await require('./telephony/hold-metrics.cjs').holdMetric(db,ref,true);
     if(restrictedCallingTest && (!call.conferenceMode || !callingTestApproval.testCallingLeadIds?.includes(call.leadId) || callingTestApproval.testCallingDestinations?.[call.leadId]!==call.destination || callingTestApproval.testCallerId!==call.from))throw new HttpsError('permission-denied','This handoff is outside the approved conference test.');
       try {
         const consultation = await provider.start({to:contact.phone,from:call.from,callbackUrl:process.env.TELEPHONY_STATUS_URL,timeoutSeconds:routing.tree.ringSeconds,commandId:crypto.randomUUID(),clientState:require('./telephony/server-dial.cjs').state(callSid,tenantId,'consultation')});
         await ref.update({consultationCallId:consultation.id,transferStatus:'consulting',updatedAt:FieldValue.serverTimestamp()});
-      } catch { await provider.hold(call.conferenceId,call.providerCallId,false);await ref.update({transferStatus:'needs_reconciliation'});throw new HttpsError('failed-precondition','Consultation could not be confirmed. The lead has been taken off hold; reconcile the recipient call before retrying.'); }
+      } catch { await provider.hold(call.conferenceId,call.providerCallId,false);await require('./telephony/hold-metrics.cjs').holdMetric(db,ref,false);await ref.update({transferStatus:'needs_reconciliation'});throw new HttpsError('failed-precondition','Consultation could not be confirmed. The lead has been taken off hold; reconcile the recipient call before retrying.'); }
       return {ok:true,callId:callSid,status:'consulting'};
     }
     if (!call.consultationCallId) throw new HttpsError('failed-precondition','No active consultation.');
@@ -882,14 +892,14 @@ exports.communications = onCall({ enforceAppCheck: true, secrets: [telnyxApiKey]
       return {ok:true,callId:callSid,status:(await ref.get()).data().transferStatus};
     }
     if (action==='cancel_transfer') {
-      if(call.consultationStatus!=='completed')await provider.end(call.consultationCallId); await provider.hold(call.conferenceId,call.providerCallId,false);
+      if(call.consultationStatus!=='completed')await provider.end(call.consultationCallId); await provider.hold(call.conferenceId,call.providerCallId,false);await require('./telephony/hold-metrics.cjs').holdMetric(db,ref,false);
       await ref.update({consultationCallId:null,consultationJoined:false,consultationStatus:null,transferStatus:'cancelled',updatedAt:FieldValue.serverTimestamp()});
       return {ok:true,callId:callSid,status:'in_progress'};
     }
     if (call.consultationStatus!=='answered') throw new HttpsError('failed-precondition','The customer must answer before handoff.');
     if(call.consultationJoined!==true)throw new HttpsError('failed-precondition','Wait until the customer is connected to the consultation.');
     await ref.update({transferStatus:'completion_requested'});
-    await provider.hold(call.conferenceId,call.providerCallId,false);
+    await provider.hold(call.conferenceId,call.providerCallId,false);await require('./telephony/hold-metrics.cjs').holdMetric(db,ref,false);
     await provider.remove(call.conferenceId,call.agentCallId);
     await provider.end(call.agentCallId);
     await ref.update({transferStatus:'completed',handoffAt:FieldValue.serverTimestamp()});
@@ -914,6 +924,7 @@ exports.communications = onCall({ enforceAppCheck: true, secrets: [telnyxApiKey]
       if(index>=0)await db.doc(`tenants/${tenantId}/config/handoffRotation`).set({cursor:(index+1)%tree.recipients.length,updatedAt:FieldValue.serverTimestamp()});
     }
     const leadData = leadSnapshot.data();
+    if(!require('./staff-policy.cjs').campaignAllowed(assignment,leadData))throw new HttpsError('permission-denied','Campaign is outside this agent’s workflow.');
     brandId = recordBrandId(leadData);
     requireAssignmentBrand(assignment, brandId);
     if (leadData.queueOwnerUid !== caller.uid || (leadData.queueLeaseExpiresAt?.toMillis?.() || 0) < Date.now()) throw new HttpsError('failed-precondition','Accept this lead before calling.');
@@ -976,7 +987,7 @@ exports.communications = onCall({ enforceAppCheck: true, secrets: [telnyxApiKey]
       from:number.phoneNumber, direction: 'outbound', destination: String(params.to).slice(0, 80), status: result.status || 'queued',
       recordingPolicy, recordingConsent:params.recordingConsent===true, recordingRequested:recordingPolicy!=='do_not_record', recordingStatus:null,
       agentLegStatus:'requested',leadDialStatus:null,conferenceMode:conferenceTest,
-      startedAt: FieldValue.serverTimestamp(), endedAt: null, createdBy: caller.uid,
+      startedAt: FieldValue.serverTimestamp(), holdSeconds:0, endedAt: null, createdBy: caller.uid,
       createdAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp(),
     });
     await db.doc(`gmsCallBindings/${callId}`).create({callPath:callRef.path,tenantId,brandId,
@@ -1017,7 +1028,7 @@ exports.communications = onCall({ enforceAppCheck: true, secrets: [telnyxApiKey]
     if (existing.provider !== provider.name || existing.agentUid !== caller.uid) throw new HttpsError('permission-denied','Call ownership or provider mismatch.');
     if (!existing.providerCallId) throw new HttpsError('failed-precondition','The browser call has not connected to the phone service.');
     if (!existing.conferenceId) throw new HttpsError('failed-precondition','Hold is unavailable on this two-party connectivity test. Conference hold and warm transfer still require verification.');
-    try { result = await provider.hold(existing.conferenceId,existing.providerCallId,action==='hold_call'); }
+    try { result = await provider.hold(existing.conferenceId,existing.providerCallId,action==='hold_call');await require('./telephony/hold-metrics.cjs').holdMetric(db,callRef,action==='hold_call'); }
     catch { throw new HttpsError('failed-precondition','The phone service could not change hold state. The call state was not updated.'); }
   } else {
     callRef = db.doc(`tenants/${tenantId}/callRecords/${callSid}`);
@@ -1120,6 +1131,7 @@ function phoneWebhook(providerName, secrets) {
         };
         if(archiveJob) patch.recordingStatus='archive_pending';
       }
+      if(!consultation && event.answered && !current.data().connectedAt) patch.connectedAt=FieldValue.serverTimestamp();
       if(!consultation && event.status==='completed') patch.endedAt=FieldValue.serverTimestamp();
       if(!consultation && ['completed','failed','busy','no-answer','canceled'].includes(event.status) && current.data().leadId) {
         const leadRef=db.doc(`tenants/${current.data().tenantId}/leads/${current.data().leadId}`);

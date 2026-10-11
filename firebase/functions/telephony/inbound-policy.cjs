@@ -14,6 +14,7 @@ function eligible(assignment,brandId,now=Date.now()) {
 function id(value){if(typeof value!=='string'||!/^[A-Za-z0-9_-]{1,128}$/.test(value))throw new Error('Invalid identifier');return value;}
 function canClaim(call,route,assignment,now=Date.now()) {
   return route.enabled===true && openNow(route,new Date(now)) && call.status==='queued'
+    && require('../staff-policy.cjs').campaignAllowed(assignment,call)
     && call.queueDeadline?.toMillis?.()>now && eligible(assignment,call.brandId,now);
 }
 module.exports={openNow,eligible,id,canClaim};
