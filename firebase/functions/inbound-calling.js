@@ -43,7 +43,7 @@ async function callbackTask(ref,call,reason) {
   await db.doc(`tenants/${call.tenantId}/followUpTasks/inbound_${ref.id}`).set({tenantId:call.tenantId,brandId:call.brandId,leadId:call.leadId,callId:ref.id,task_type:'callback_reminder',status:'pending',title:'Return inbound call',notes:reason,dueAt:stamp(),createdAt:stamp()},{merge:true});
 }
 async function voicemail(ref,route,expectedStatus) {
-  const reserved=await db.runTransaction(async tx=>{const call=(await tx.get(ref)).data();if(!canFallback(call,expectedStatus))return null;tx.update(ref,{status:'voicemail_prompt',updatedAt:stamp()});return call;});
+  const reserved=await db.runTransaction(async tx=>{const call=(await tx.get(ref)).data();if(!canFallback(call,expectedStatus))return null;tx.update(ref,{status:'voicemail_prompt',callKind:'voicemail',updatedAt:stamp()});return call;});
   if(!reserved)return;
   await callbackTask(ref,reserved,'Caller reached voicemail.');
   if(reserved.agentCallId)await provider().end(reserved.agentCallId).catch(()=>{});
@@ -64,7 +64,7 @@ async function queue(ref,route) {
 async function queueWindow(ref,call,startMusic=true) {
   if((await ref.get()).data()?.status!=='queued')return;
   if(startMusic)await command(call.providerCallId,'playback_start',{playback_content:require('./telephony/hold-music.cjs').holdMusic(),audio_type:'wav',loop:'infinity',target_legs:'self',command_id:require('./telephony/server-dial.cjs').commandId(ref.id,`music-${call.queueCycle || 0}`)});
-  await command(call.providerCallId,'gather',{minimum_digits:1,maximum_digits:1,valid_digits:'12',initial_timeout_millis:30000,timeout_millis:30000,command_id:require('./telephony/server-dial.cjs').commandId(ref.id,`options-${call.queueCycle || 0}`)});
+  await command(call.providerCallId,'gather',{minimum_digits:1,maximum_digits:1,valid_digits:'12',initial_timeout_millis:(call.queueCycle || 0)===0?10000:30000,timeout_millis:(call.queueCycle || 0)===0?10000:30000,command_id:require('./telephony/server-dial.cjs').commandId(ref.id,`options-${call.queueCycle || 0}`)});
 }
 async function queueAnnouncement(ref,route,eventId) {
   const call=await db.runTransaction(async tx=>{const c=(await tx.get(ref)).data();if(c?.status!=='queued')return null;tx.update(ref,{queueCycle:(c.queueCycle || 0)+1,lastQueuePromptAt:stamp()});return c;});
@@ -166,8 +166,8 @@ exports.inboundCommunications=onCall({enforceAppCheck:false,secrets:[key]},async
   const ctx=await authorized(request),{action,callId,status,enabled}=request.data || {};
   if(action==='browser_session')return require('./telephony/browser-session.cjs').browserSession('telnyx',{token:key.value(),browserConnectionId:process.env.TELNYX_BROWSER_CONNECTION_ID},`gms_${ctx.user.uid}`,ctx.assignment);
   if(action==='presence') {
-    if(!['offline','available','standby','do_not_disturb','break','after_call_work','busy'].includes(status))throw new HttpsError('invalid-argument','Invalid agent status');
-    await db.runTransaction(async tx=>{const previous=(await tx.get(ctx.ref)).data() || {};tx.set(ctx.ref,{agentStatus:status,inboundEnabled:enabled===true,presenceUpdatedAt:stamp(),...(previous.agentStatus!==status?{statusChangedAt:stamp()}: {})},{merge:true});tx.set(db.doc(`agentUsers/${ctx.user.uid}`),{agent_status:status,presenceUpdatedAt:stamp()},{merge:true});if(previous.agentStatus!==status)tx.create(db.collection('gmsAgentPresenceEvents').doc(),{tenantId:ctx.tenantId,agentUid:ctx.user.uid,status,previousStatus:previous.agentStatus || 'offline',occurredAt:stamp()});});return {ok:true};
+    if(!['offline','available','standby','do_not_disturb','break','lunch','after_call_work','busy'].includes(status))throw new HttpsError('invalid-argument','Invalid agent status');
+    const statusChangedAtMs=await db.runTransaction(async tx=>{const previous=(await tx.get(ctx.ref)).data() || {};const now=Date.now(),changed=previous.agentStatus!==status,since=changed?now:previous.statusChangedAt?.toMillis?.() || now;tx.set(ctx.ref,{agentStatus:status,inboundEnabled:enabled===true,presenceUpdatedAt:stamp(),...((changed || !previous.statusChangedAt)?{statusChangedAt:Timestamp.fromMillis(since)}: {})},{merge:true});tx.set(db.doc(`agentUsers/${ctx.user.uid}`),{agent_status:status,presenceUpdatedAt:stamp()},{merge:true});if(changed)tx.create(db.collection('gmsAgentPresenceEvents').doc(),{tenantId:ctx.tenantId,agentUid:ctx.user.uid,status,previousStatus:previous.agentStatus || 'offline',previousDurationSeconds:previous.statusChangedAt?.toMillis?Math.max(0,Math.floor((now-previous.statusChangedAt.toMillis())/1000)):null,occurredAt:stamp()});return since;});return {ok:true,statusChangedAtMs};
   }
   if(action==='list') {
     if(request.data.connected===true && ctx.assignment.agentStatus==='available' && ctx.assignment.inboundEnabled===true){await ctx.ref.update({presenceUpdatedAt:stamp()});ctx.assignment.presenceUpdatedAt=Timestamp.now();}
@@ -186,7 +186,7 @@ exports.inboundCommunications=onCall({enforceAppCheck:false,secrets:[key]},async
       const lr=db.doc(`tenants/${ctx.tenantId}/leads/${c.leadId}`),lead=await tx.get(lr);
       if(lead.data()?.activeCallId)throw new HttpsError('failed-precondition','This lead already has an active call.');
       tx.update(ref,{status:'dialing_agent',agentUid:ctx.user.uid,agentSipDestination:sip,agentDeadline:Timestamp.fromMillis(Date.now()+25000)});
-      tx.update(ctx.ref,{agentStatus:'busy',presenceUpdatedAt:stamp()});tx.update(lr,{activeCallId:ref.id});tx.update(db.doc(`gmsCallBindings/${ref.id}`),{agentUid:ctx.user.uid,agentSipDestination:sip});return c;
+      tx.update(ctx.ref,{agentStatus:'busy',statusChangedAt:stamp(),presenceUpdatedAt:stamp()});tx.create(db.collection('gmsAgentPresenceEvents').doc(),{tenantId:ctx.tenantId,agentUid:ctx.user.uid,status:'busy',previousStatus:assignment.data().agentStatus,previousDurationSeconds:assignment.data().statusChangedAt?.toMillis?Math.max(0,Math.floor((Date.now()-assignment.data().statusChangedAt.toMillis())/1000)):null,occurredAt:stamp()});tx.update(lr,{activeCallId:ref.id});tx.update(db.doc(`gmsCallBindings/${ref.id}`),{agentUid:ctx.user.uid,agentSipDestination:sip});return c;
     });
     try {const result=await provider().start({to:sip,from:call.from,callbackUrl:callbackUrl(),timeoutSeconds:20,commandId:require('./telephony/server-dial.cjs').commandId(ref.id,'inbound-agent'),clientState:require('./telephony/server-dial.cjs').state(ref.id,ctx.tenantId,'inbound_agent')});await ref.update({agentCallId:result.id});}
     catch(error){await voicemail(ref,ctx.route);throw new HttpsError('unavailable','Agent connection failed; caller routed to voicemail.');}

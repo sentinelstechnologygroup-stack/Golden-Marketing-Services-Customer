@@ -36,7 +36,7 @@ exports.getGmsCallRecordingDownload=onCall({enforceAppCheck:true,maxInstances:2}
   if(metadata.metadata?.sha256!==evidence.sha256 || Number(metadata.size)!==evidence.bytes || metadata.contentType!=='audio/wav') throw new HttpsError('failed-precondition','The recording verification did not pass.');
   const expiresAtMs=Date.now()+5*60*1000;
   const [url]=await file.getSignedUrl({version:'v4',action:'read',expires:expiresAtMs,
-    responseDisposition:`attachment; filename="GMS-call-${context.callId}.wav"`,responseType:'audio/wav'});
+    responseDisposition:`${request.data?.playback===true?'inline':'attachment'}; filename="GMS-call-${context.callId}.wav"`,responseType:'audio/wav'});
   await db.collection(`tenants/${context.tenantId}/auditLogs`).add({tenantId:context.tenantId,action:'call.recording_download_authorized',actorUid:context.user.uid,callId:context.callId,recordingId,createdAt:FieldValue.serverTimestamp()});
   return {url,expiresAtMs};
 });

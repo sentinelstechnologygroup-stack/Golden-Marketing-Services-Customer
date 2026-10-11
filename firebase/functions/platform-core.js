@@ -788,7 +788,7 @@ exports.communications = onCall({ enforceAppCheck: true, secrets: [telnyxApiKey]
     catch { return {ok:true,configured:false,healthy:false,mode:'unavailable',warning:'Calling is awaiting phone-service configuration.'}; }
   }
   if (action === 'set_availability') {
-    if (!['offline','available','away','after_call_work','standby','do_not_disturb','break','busy'].includes(params.status)) throw new HttpsError('invalid-argument','Invalid availability.');
+    if (!['offline','available','away','after_call_work','standby','do_not_disturb','break','lunch','busy'].includes(params.status)) throw new HttpsError('invalid-argument','Invalid availability.');
     const presenceRef=db.doc(`agentUsers/${caller.uid}/assignments/${tenantId}`);
     await db.runTransaction(async tx=>{const previous=(await tx.get(presenceRef)).data() || {};const changed=previous.agentStatus!==params.status;const now=Date.now();
       tx.set(presenceRef,{agentStatus:params.status,presenceUpdatedAt:FieldValue.serverTimestamp(),...(changed?{statusChangedAt:FieldValue.serverTimestamp()}: {})},{merge:true});

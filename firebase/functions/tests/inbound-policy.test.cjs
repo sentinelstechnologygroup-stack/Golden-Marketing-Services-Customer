@@ -13,7 +13,7 @@ test('Central daily hours follow daylight saving with closing boundary excluded'
 });
 test('inbound offers exclude other brands, stale presence, unavailable and revoked staff',()=>{
  assert.ok(eligible(assignment,'gcr',now));
- for(const patch of [{status:'revoked'},{role:'ai_admin'},{agentStatus:'break'},{inboundEnabled:false},{presenceUpdatedAt:{toMillis:()=>now-80000}}])assert.equal(eligible({...assignment,...patch},'gcr',now),false);
+ for(const patch of [{status:'revoked'},{role:'ai_admin'},{agentStatus:'break'},{agentStatus:'lunch'},{agentStatus:'standby'},{agentStatus:'do_not_disturb'},{agentStatus:'after_call_work'},{inboundEnabled:false},{presenceUpdatedAt:{toMillis:()=>now-80000}}])assert.equal(eligible({...assignment,...patch},'gcr',now),false);
  assert.equal(eligible(assignment,'different-brand',now),false);
 });
 test('only pending, unexpired offers can be claimed; accepted calls cannot be claimed twice',()=>{
