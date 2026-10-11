@@ -80,7 +80,7 @@ const IMMUTABLE_TENANT_FIELDS = new Set([
   'tenantId', 'organization_id', 'industry', 'industryId', 'brandId', 'brand_id',
   'sourceId', 'source_id', 'campaignId', 'campaign_id', 'routingProfileId',
   'workflowVersion', 'scriptSetId', 'qualificationFormId', 'consentPolicyId',
-  'retentionPolicyId', 'notificationProfileId', 'receivedAt', 'createdAt', 'createdBy',
+  'intakeStage', 'retentionPolicyId', 'notificationProfileId', 'receivedAt', 'createdAt', 'createdBy',
 ]);
 const INDUSTRY_POLICY_FIELDS = ['industryId', 'workflowVersion', 'scriptSetId', 'qualificationFormId', 'routingProfileId', 'consentPolicyId', 'retentionPolicyId'];
 
@@ -635,11 +635,12 @@ exports.updateAgentRecord = onCall({ enforceAppCheck: true }, async (request) =>
   if(['callTranscripts','callQualityReviews'].includes(collectionName) &&
     (current.data().aiGenerated===true || current.data().managedBy==='recording_worker' || patch.aiGenerated===true || patch.managedBy==='recording_worker')) throw new HttpsError('permission-denied','AI evidence is managed by the backend. Add a separate human review.');
   if (collectionName === 'callRecords' && current.data().provider === 'telnyx') {
-    const protectedFields = ['provider', 'providerCallId', 'agentCallId', 'agentUid', 'agentId', 'leadId', 'from', 'destination', 'direction', 'status', 'agentLegStatus', 'leadDialStatus', 'recordingPolicy', 'recordingConsent', 'recordingRequested', 'recordingStatus', 'recordingStoragePath', 'startedAt', 'endedAt'];
+    const protectedFields = ['transferStatus','handoffRecipientId','handoffAt','consultationStatus','consultationJoined','consultationCallId','conferenceId','handoffOrder','handoffIndex', 'provider', 'providerCallId', 'agentCallId', 'agentUid', 'agentId', 'leadId', 'from', 'destination', 'direction', 'status', 'agentLegStatus', 'leadDialStatus', 'recordingPolicy', 'recordingConsent', 'recordingRequested', 'recordingStatus', 'recordingStoragePath', 'startedAt', 'endedAt'];
     if (Object.keys(patch).some(field => protectedFields.includes(field) || field.startsWith('recording') || field.startsWith('provider'))) {
       throw new HttpsError('permission-denied', 'Calling and recording evidence are managed by the backend.');
     }
   }
+  if (collectionName === 'leads') await require('./website-qualification-gate.cjs').enforceWebsiteQualification({db,tenantId,lead:{...current.data(),id:recordId},patch});
   await recordRef.update({ ...patch, updatedAt: FieldValue.serverTimestamp(), updatedBy: caller.uid });
   await recordAudit({ tenantId, actorUid: caller.uid, action: `crm.${collectionName}.updated`, target: recordId });
   return { id: recordId, ...current.data(), ...patch };
@@ -702,6 +703,7 @@ exports.transitionLead = onCall({ enforceAppCheck: true }, async (request) => {
     const patch = { status, lead_status: status, updatedAt: FieldValue.serverTimestamp(), updatedBy: caller.uid };
     if (disposition !== null) patch.disposition = String(disposition).slice(0, 500);
     if (note !== null) patch.latestNote = String(note).slice(0, 2000);
+    await require('./website-qualification-gate.cjs').enforceWebsiteQualification({db,tenantId,lead:{...snapshot.data(),id:leadId},patch,reader:transaction});
     transaction.update(leadRef, patch);
     return { id: leadId, ...snapshot.data(), ...patch };
   });

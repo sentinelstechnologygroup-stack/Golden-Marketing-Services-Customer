@@ -37,6 +37,7 @@ function canonicalLead(route, payload, assignedTo = null, clientContact = null) 
     consentPolicyId: route.consentPolicyId,
     retentionPolicyId: route.retentionPolicyId,
     notificationProfileId: route.notificationProfileId || 'default',
+    intakeStage: route.intakeStage === 'gms_qualification' || payload.attribution?.sourceSite === 'homes-around-north-houston' ? 'gms_qualification' : 'legacy',
     firstName,
     first_name: firstName,
     lastName,

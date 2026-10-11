@@ -158,11 +158,20 @@ exports.ingestWebsiteLead = onRequest({ cors: false, secrets: [ingestionKey], ti
     return response.status(409).json({ error: error.message });
   }
   if (!lead.email && !lead.phone) return response.status(400).json({ error: 'Email or phone is required' });
-  const now = FieldValue.serverTimestamp();
-  await leadRef.set({ ...lead, receivedAt: now, createdAt: now, updatedAt: now, createdBy: 'server:website-ingestion' });
-  await writeAudit(route.tenantId, 'server:website-ingestion', 'lead.ingested', leadRef.id, { brandId: route.brandId, routeKey, assignedTo });
-  await notifyTenant({ tenantId: route.tenantId, brandId: route.brandId, assignedTo, clientContactUid: clientContact?.uid || clientContact?.memberUid, type: 'lead_received', title: 'New lead received', body: `${lead.name} entered the ${brand.data().name || 'client'} queue.`, relatedId: leadRef.id });
-  return response.status(202).json({ accepted: true, leadId: leadRef.id, receivedAt: new Date().toISOString() });
+  const { persistWebsiteLead } = require('./website-intake-store.cjs');
+  try {
+    const receipt = await persistWebsiteLead({ db, routeKey, route, leadRef, lead,
+      idempotencyKey: request.get('idempotency-key'),
+      notificationRecipients: lead.intakeStage === 'gms_qualification' ? [assignedTo] : await recipientUids(route.tenantId,assignedTo,clientContact?.uid || clientContact?.memberUid),
+      brandName: brand.data().name, clientContactUid: clientContact?.uid || clientContact?.memberUid });
+    return response.status(202).json({ accepted: true, leadId: receipt.leadId, duplicate: receipt.duplicate });
+  } catch (error) {
+    if (error.code === 'intake-conflict') return response.status(409).json({ error: 'Submission reference already used for different inquiry details' });
+    if (error.code === 'intake-key') return response.status(400).json({ error: 'Invalid submission reference' });
+    if (error.code === 'intake-throttled') return response.status(429).json({ error: 'Please wait before submitting another inquiry' });
+    console.error('Website intake persistence failed', { routeKey, code: error.code || 'unknown' });
+    return response.status(503).json({ error: 'Intake temporarily unavailable' });
+  }
 });
 
 exports.registerTenantAsset = onCall({ enforceAppCheck: true }, async (request) => {

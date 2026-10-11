@@ -146,6 +146,7 @@ test('existing-route ingestion, Agent workflow, Customer projection, and Brand i
     TELEPHONY_STATUS_URL: 'https://example.test/webhook',
     TELNYX_DIALING_RESTRICTIONS_VERIFIED: 'true', TELEPHONY_WARM_TRANSFER_ENABLED: 'false',GMS_RECORDING_PIPELINE_READY:'true',
   });
+  await functions.communications.run(agentRequest({action:'set_availability',params:{status:'available'}}));
   await assert.rejects(
     functions.communications.run(agentRequest({
       action: 'start_call',
