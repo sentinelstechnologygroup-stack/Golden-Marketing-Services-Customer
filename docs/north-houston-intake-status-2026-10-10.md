@@ -41,3 +41,15 @@ Verified October 10, 2026 (America/Chicago).
 5. Repliers integration, provider-owned lead-copy settings, domain/DNS launch and paid-traffic conversion-account verification remain pending. Human-verification challenge remains deferred as instructed.
 
 Review packet: ../output/north-houston-workflow-review.md in the GMS workspace, also saved privately in the GCR client cabinet. No GMS reference originals, tax or ownership documents were uploaded or committed.
+
+## Shared listing-email preference and financing review update
+
+- Onboarding revision 15 preserves the draft inquiry/representation questions pending client approval and adds optional, non-disqualifying financing branches.
+- The website search-preferences form and phone-agent Step 3 share one saved weekly listing-email preference. The checkbox starts selected only when no earlier choice exists; saved declines and unsubscribes are respected.
+- Requested emails create one manual Realtor setup task. Neither that task nor saving the preference sends email, texts, or activates a provider alert. Verify the provider unsubscribe mechanism and suppression list before manual activation; email preference is not SMS permission.
+- Concurrent/stale saves cannot replace a newer choice. Existing unsubscribe/suppression prevents re-enrollment. Explicit lender-referral requests are recorded without changing qualification.
+- Restricted staff supplemental-preference callable deployed: saveleadsupplementalpreferences-00001-lij. Anonymous production requests return 401. Authorization and assignment checks, preference lifecycle, task deduplication, financing branches, and stale-save/opt-out tests passed; both frontend builds passed.
+- Website review preview: https://homes-around-north-houston-v1-b9bcxw2hp.vercel.app (commit 9d330c7).
+- Agent Portal review preview: https://golden-marketing-services-agent-cu17qp78x.vercel.app (commit d862bcf089970650820fae523af329d869de528d).
+- These are review previews, not production frontend promotions. Campaign remains paused; client approval, attended phone/Realtor handoff testing, provider email-unsubscribe verification, Repliers integration and domain launch remain pending.
+- Shared-workspace funnel work from another task was preserved. Its new two-stage capture integration was tested locally but was not included in this task's isolated production function deployment.
