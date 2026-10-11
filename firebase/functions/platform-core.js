@@ -641,7 +641,11 @@ exports.updateAgentRecord = onCall({ enforceAppCheck: true }, async (request) =>
     }
   }
   if (collectionName === 'leads') await require('./website-qualification-gate.cjs').enforceWebsiteQualification({db,tenantId,lead:{...current.data(),id:recordId},patch});
+  if (collectionName === 'leads' && patch.communicationPreferences?.weeklyListingEmails) {
+    await require('./agent-listing-preferences.cjs').saveAgentListingPreference({db,recordRef,patch,callerUid:caller.uid});
+  } else {
   await recordRef.update({ ...patch, updatedAt: FieldValue.serverTimestamp(), updatedBy: caller.uid });
+  }
   await recordAudit({ tenantId, actorUid: caller.uid, action: `crm.${collectionName}.updated`, target: recordId });
   return { id: recordId, ...current.data(), ...patch };
 });
