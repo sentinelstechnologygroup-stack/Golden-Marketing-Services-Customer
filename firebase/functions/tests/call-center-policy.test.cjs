@@ -17,3 +17,12 @@ test('status durations are clipped to the reporting window, including lunch',()=
 test('selected campaigns exclude other campaign leads but permit direct inquiries',()=>{
  const {campaignAllowed}=require('../staff-policy.cjs');const a={campaignAccess:'selected',campaignIds:['one']};assert.equal(campaignAllowed(a,{campaignId:'one'}),true);assert.equal(campaignAllowed(a,{campaignId:'two'}),false);assert.equal(campaignAllowed(a,{}),true);
 });
+
+test('shared unanswered alerts never attribute a miss to agents who did not accept',()=>{
+ const result=summarize([c('abandoned',{agentUid:null,queuedAt:base,endedAt:base+15000}),c('answered',{agentUid:'b',queuedAt:base,acceptedAt:base+1000,connectedAt:base+4000,endedAt:base+30000}),c('vm',{agentUid:null,queuedAt:base,callKind:'voicemail',endedAt:base+30000}),c('callback',{agentUid:null,queuedAt:base,callbackRequestedAt:base+2000,endedAt:base+30000})],[],base,base+60000);
+ assert.equal(result.summary.abandoned,1);assert.equal(result.summary.abandonmentRate,.25);assert.equal(result.summary.avgAnswerSeconds,4);assert.equal(result.byAgent.find(r=>r.id==='b').failedAgentConnections,0);assert.equal(result.byAgent.some(r=>r.id==='a'),false);
+});
+test('failures require accepted connection or explicit transfer outcome; qualifications deduplicate',()=>{
+ const result=summarize([c('failed',{acceptedAt:base,endedAt:base+5000}),c('transfer',{transferStatus:'exhausted',leadId:'l',tenantId:'t',qualifiedByAgent:true}),c('repeat',{transferStatus:'completed',leadId:'l',tenantId:'t',qualifiedByAgent:true}),c('cancel',{transferStatus:'cancelled'}),c('pending',{transferStatus:'consulting'})],[],base,base+60000);
+ assert.equal(result.summary.failedAgentConnections,1);assert.equal(result.summary.failedTransfers,1);assert.equal(result.summary.cancelledTransfers,1);assert.equal(result.summary.pendingTransfers,1);assert.equal(result.summary.qualifiedLeads,1);assert.equal(result.byWeek.length,1);
+});

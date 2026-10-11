@@ -641,6 +641,10 @@ exports.updateAgentRecord = onCall({ enforceAppCheck: true }, async (request) =>
   requireAssignmentBrand(assignment, recordBrandId(current.data()));
   if(collectionName==='leads' && !require('./staff-policy.cjs').campaignAllowed(assignment,current.data()))throw new HttpsError('permission-denied','Campaign is outside this agent’s workflow.');
   const patch = stripImmutablePatch(data);
+  if (['leads','followUpTasks'].includes(collectionName) && Object.keys(patch).some(key=>['qualifiedBy','completedBy','completedAt'].includes(key.split('.')[0]))) throw new HttpsError('permission-denied','Performance attribution is managed by the backend.');
+  if (collectionName==='leads' && !current.data().qualifiedAt && (patch.qualifiedAt || patch.qualificationStatus==='qualified' || patch.qualification_status==='qualified')) { patch.qualifiedAt=FieldValue.serverTimestamp();patch.qualifiedBy=caller.uid; }
+  else if(collectionName==='leads' && current.data().qualifiedAt && Object.hasOwn(patch,'qualifiedAt')) delete patch.qualifiedAt;
+  if(collectionName==='followUpTasks' && patch.status==='completed' && current.data().status!=='completed'){patch.completedAt=FieldValue.serverTimestamp();patch.completedBy=caller.uid;}
   if (assignment?.role === 'agent' && collectionName === 'leads' && Object.hasOwn(patch, 'assignedTo') && patch.assignedTo !== current.data().assignedTo) throw new HttpsError('permission-denied', 'A supervisor must reassign leads.');
   if(['callTranscripts','callQualityReviews'].includes(collectionName) &&
     (current.data().aiGenerated===true || current.data().managedBy==='recording_worker' || patch.aiGenerated===true || patch.managedBy==='recording_worker')) throw new HttpsError('permission-denied','AI evidence is managed by the backend. Add a separate human review.');
@@ -716,6 +720,7 @@ exports.transitionLead = onCall({ enforceAppCheck: true }, async (request) => {
     requireAssignmentBrand(assignment, recordBrandId(snapshot.data()));
     if(!require('./staff-policy.cjs').campaignAllowed(assignment,snapshot.data()))throw new HttpsError('permission-denied','Campaign is outside this agent’s workflow.');
     const patch = { status, lead_status: status, updatedAt: FieldValue.serverTimestamp(), updatedBy: caller.uid };
+    if(status==='qualified' && !snapshot.data().qualifiedAt){patch.qualifiedAt=FieldValue.serverTimestamp();patch.qualifiedBy=caller.uid;}
     if (disposition !== null) patch.disposition = String(disposition).slice(0, 500);
     if (note !== null) patch.latestNote = String(note).slice(0, 2000);
     await require('./website-qualification-gate.cjs').enforceWebsiteQualification({db,tenantId,lead:{...snapshot.data(),id:leadId},patch,reader:transaction});
