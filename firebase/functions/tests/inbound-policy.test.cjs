@@ -41,7 +41,7 @@ test('signed auxiliary events may omit addresses but may not contradict bound ow
 
 test('music buffer is a short original mono WAV suitable for inline provider playback',()=>{
  const {holdMusic}=require('../telephony/hold-music.cjs');const audio=Buffer.from(holdMusic(),'base64');
- assert.equal(audio.toString('ascii',0,4),'RIFF');assert.equal(audio.toString('ascii',8,12),'WAVE');assert.equal(audio.readUInt32LE(24),8000);assert.equal(audio.readUInt16LE(22),1);assert.ok(audio.length<1000000);
+ assert.equal(audio.toString('ascii',0,4),'RIFF');assert.equal(audio.toString('ascii',8,12),'WAVE');assert.equal(audio.readUInt32LE(24),8000);assert.equal(audio.readUInt16LE(22),1);assert.ok(audio.length<1000000);assert.equal(audio.readUInt32LE(40)/(audio.readUInt32LE(24)*2),60);
 });
 
 test('agent offering waits for the exact recording notice to complete',()=>{
