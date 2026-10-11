@@ -843,6 +843,10 @@ exports.communications = onCall({ enforceAppCheck: true, secrets: [telnyxApiKey]
     if (call.tenantId!==tenantId || call.agentUid!==caller.uid || call.provider!==provider.name) throw new HttpsError('permission-denied','Call ownership or provider mismatch.');
     if (!call.conferenceId || !call.agentCallId) throw new HttpsError('failed-precondition','A connected conference is required for handoff controls.');
     if (action==='mute_call') { await provider.mute(call.conferenceId,call.agentCallId,params.muted===true); return {ok:true,callId:callSid,muted:params.muted===true}; }
+    if (['start_consultation','skip_consultation','complete_transfer'].includes(action) && call.leadId) {
+      const handoffLead = (await db.doc(`tenants/${tenantId}/leads/${call.leadId}`).get()).data();
+      if (handoffLead) await require('./website-qualification-gate.cjs').enforceWebsiteHandoff({db,tenantId,lead:handoffLead});
+    }
     if (action==='start_consultation') {
       if (call.consultationCallId || ['starting','consulting','completion_requested'].includes(call.transferStatus)) throw new HttpsError('already-exists','A consultation is already active.');
       const onboarding=(await db.doc(`tenants/${tenantId}/config/onboarding`).get()).data()?.data;

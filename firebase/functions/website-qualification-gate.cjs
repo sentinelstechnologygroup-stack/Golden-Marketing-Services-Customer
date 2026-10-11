@@ -18,4 +18,9 @@ async function enforceWebsiteQualification({db,tenantId,lead,patch,reader=db}) {
   if(!calls.docs.some(d=>d.data().provider==='telnyx' && d.data().transferStatus==='completed' && d.data().consultationStatus==='answered' && d.data().consultationJoined===true && d.data().handoffAt && d.data().handoffRecipientId))throw new HttpsError('failed-precondition','A completed provider handoff is required; a manually entered disposition cannot certify a live transfer.');
  }
 }
-module.exports={enforceWebsiteQualification};
+async function enforceWebsiteHandoff({db,tenantId,lead}) {
+ if(lead.intakeStage!=='gms_qualification' && lead.attribution?.sourceSite!=='homes-around-north-houston')return;
+ if((lead.qualificationStatus || lead.qualification_status)!=='qualified')throw new HttpsError('failed-precondition','Save verified, broker-approved qualification before starting the Realtor handoff.');
+ await enforceWebsiteQualification({db,tenantId,lead,patch:{status:'qualified'}});
+}
+module.exports={enforceWebsiteQualification,enforceWebsiteHandoff};

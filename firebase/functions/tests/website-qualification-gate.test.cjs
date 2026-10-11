@@ -14,3 +14,9 @@ test('manual dispositions cannot fabricate a provider handoff; callbacks and oth
  await gate({db:db(null),tenantId:'tenant-one',lead,patch:{status:'appointment_scheduled'}});
  await gate({db:db(null),tenantId:'tenant-one',lead:{...lead,attribution:{}},patch:{status:'qualified'}});
 });
+
+test('consultation cannot start before website qualification is saved',async()=>{
+ const {enforceWebsiteHandoff:handoff}=require('../website-qualification-gate.cjs');
+ await assert.rejects(handoff({db:db(approved),tenantId:'tenant-one',lead}),{code:'failed-precondition'});
+ await handoff({db:db(approved),tenantId:'tenant-one',lead:{...lead,qualificationStatus:'qualified',qualification_data:{identity:'yes'},verification_status:'verified',conversationCompletedAt:'2026-10-10T12:00:00Z'}});
+});
