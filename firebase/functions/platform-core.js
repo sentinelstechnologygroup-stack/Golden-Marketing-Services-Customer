@@ -658,7 +658,8 @@ exports.updateAgentRecord = onCall({ enforceAppCheck: true }, async (request) =>
   if (collectionName === 'leads' && patch.communicationPreferences?.weeklyListingEmails) {
     await require('./agent-listing-preferences.cjs').saveAgentListingPreference({db,recordRef,patch,callerUid:caller.uid});
   } else {
-  await recordRef.update({ ...patch, updatedAt: FieldValue.serverTimestamp(), updatedBy: caller.uid });
+  if(collectionName==='leads' && require('./callback-resolution.cjs').successful.has(patch.disposition)) await require('./callback-resolution.cjs').saveLeadOutcome({db,ref:recordRef,patch:{...patch,updatedAt:FieldValue.serverTimestamp(),updatedBy:caller.uid},tenantId,leadId:recordId,brandId:recordBrandId(current.data()),actorUid:caller.uid,disposition:patch.disposition});
+  else await recordRef.update({ ...patch, updatedAt: FieldValue.serverTimestamp(), updatedBy: caller.uid });
   }
   await recordAudit({ tenantId, actorUid: caller.uid, action: `crm.${collectionName}.updated`, target: recordId });
   return { id: recordId, ...current.data(), ...patch };
@@ -724,6 +725,7 @@ exports.transitionLead = onCall({ enforceAppCheck: true }, async (request) => {
     if (disposition !== null) patch.disposition = String(disposition).slice(0, 500);
     if (note !== null) patch.latestNote = String(note).slice(0, 2000);
     await require('./website-qualification-gate.cjs').enforceWebsiteQualification({db,tenantId,lead:{...snapshot.data(),id:leadId},patch,reader:transaction});
+    await require('./callback-resolution.cjs').resolveInTransaction({db,tx:transaction,tenantId,leadId,brandId:recordBrandId(snapshot.data()),actorUid:caller.uid,disposition});
     transaction.update(leadRef, patch);
     return { id: leadId, ...snapshot.data(), ...patch };
   });
