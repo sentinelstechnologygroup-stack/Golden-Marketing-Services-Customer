@@ -218,12 +218,30 @@ exports.getMyProfile = onCall({ enforceAppCheck: false }, async (request) => {
     db.collectionGroup('members').where('uid', '==', caller.uid).where('active', '==', true).get(),
     db.collection(`agentUsers/${caller.uid}/assignments`).where('status', '==', 'active').get(),
   ]);
-  const agentAssignments = await Promise.all(assignments.docs.map(async (assignmentDoc) => {
-    const assignment = assignmentDoc.data();
+  let assignmentRows = assignments.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+  if (user.customClaims?.gmsSuperAdmin === true) {
+    const tenants = await db.collection('tenants').limit(501).get();
+    if (tenants.size > 500) throw new HttpsError('resource-exhausted', 'Client directory requires pagination.');
+    assignmentRows = tenants.docs.filter(doc => !['disabled','archived'].includes(doc.data().status)).map(doc => ({
+      ...(assignmentRows.find(a => (a.tenantId || a.id) === doc.id) || {}), id: doc.id, tenantId: doc.id, status: 'active', role: 'gms_super_admin'
+    }));
+  }
+  const agentAssignments = await Promise.all(assignmentRows.map(async (assignmentDoc) => {
+    const assignment = assignmentDoc;
     const tenant = await db.doc(`tenants/${assignment.tenantId || assignmentDoc.id}`).get();
+    const [inbound, approval] = await Promise.all([
+      db.doc(`tenants/${tenant.id}/config/inboundCalling`).get(), db.doc(`gmsTestingApprovals/${tenant.id}`).get()
+    ]);
+    const route = inbound.data(), test = approval.data();
+    const phoneRole = ['agent','supervisor','gms_super_admin'].includes(assignment.role) || assignment.role==='admin' && user.customClaims?.gmsSuperAdmin===true;
+    const inboundPhoneEnabled = Boolean(phoneRole && assignment.telnyxCredentialId && route?.enabled === true && [assignment.brandId,...(assignment.brandIds || [])].includes(route.brandId));
+    const phoneEnabled = Boolean(phoneRole && assignment.telnyxCredentialId && (inboundPhoneEnabled ||
+      test?.testCallingApproved === true && test.testCallingActorUids?.includes(user.uid)));
     return {
       id: assignmentDoc.id,
       ...assignment,
+      phoneEnabled,
+      inboundPhoneEnabled,
       tenantId: assignment.tenantId || assignmentDoc.id,
       tenantName: tenant.data()?.name || assignment.tenantName || assignment.tenantId || assignmentDoc.id,
       tenantStatus: tenant.data()?.status || 'active',
@@ -240,7 +258,8 @@ exports.getMyProfile = onCall({ enforceAppCheck: false }, async (request) => {
     locale: profile.data()?.locale || null,
     disabled: user.disabled,
     mustChangePassword: user.customClaims?.mustChangePassword === true,
-    gmsSuperAdmin: caller.token?.gmsSuperAdmin === true,
+    gmsSuperAdmin: user.customClaims?.gmsSuperAdmin === true,
+    role: user.customClaims?.role || null,
     memberships: memberships.docs.map((doc) => ({ id: doc.id, ...doc.data(), role: normalizeRole(doc.data().role) })),
     agentAssignments,
   };
@@ -595,12 +614,15 @@ exports.getLiveReport = onCall({ enforceAppCheck: false }, async (request) => {
 });
 
 exports.getAgentCollection = onCall({ enforceAppCheck: false }, async (request) => {
-  const { tenantId, collectionName, limit: requestedLimit = 200 } = request.data || {};
+  const { tenantId, collectionName, limit: requestedLimit = 200, recordId } = request.data || {};
   const { assignment } = await requireAgentAssignment(request, tenantId, ['admin', 'supervisor', 'agent', 'ai_admin', 'auditor']);
   if (!AGENT_COLLECTIONS.has(collectionName)) throw new HttpsError('invalid-argument', 'Collection is not available through the CRM API.');
   if (assignment && !require('./staff-policy.cjs').collectionAllowed(assignment.role, collectionName)) throw new HttpsError('permission-denied', 'This collection is outside your job role.');
   const pageSize = Math.min(Math.max(Number(requestedLimit) || 200, 1), 500);
-  const snapshot = await db.collection(`tenants/${tenantId}/${collectionName}`).where('tenantId', '==', tenantId).limit(pageSize).get();
+  if(recordId !== undefined && (typeof recordId !== 'string' || !/^[A-Za-z0-9_-]{1,128}$/.test(recordId))) throw new HttpsError('invalid-argument','Invalid record identifier.');
+  const snapshot = recordId
+    ? await db.collection(`tenants/${tenantId}/${collectionName}`).where('tenantId','==',tenantId).where(require('firebase-admin/firestore').FieldPath.documentId(),'==',recordId).get()
+    : await db.collection(`tenants/${tenantId}/${collectionName}`).where('tenantId', '==', tenantId).limit(pageSize).get();
   let rows = snapshot.docs
     .map((item) => ({ id: item.id, ...item.data() }))
     .filter((item) => item.archived !== true && assignmentAllowsBrand(assignment, recordBrandId(item)))

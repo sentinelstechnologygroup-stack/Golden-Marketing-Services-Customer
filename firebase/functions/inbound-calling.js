@@ -184,10 +184,18 @@ exports.inboundCommunications=onCall({enforceAppCheck:false,secrets:[key]},async
     if(credential.connection_id!==process.env.TELNYX_BROWSER_CONNECTION_ID || !credential.sip_username)throw new HttpsError('failed-precondition','Agent phone is not provisioned');
     const sip=require('./telephony/server-dial.cjs').agentDestination(credential.sip_username);
     const call=await db.runTransaction(async tx=>{
-      const [saved,assignment]=await Promise.all([tx.get(ref),tx.get(ctx.ref)]);const c=saved.data();
+      const globalAgentRef=db.doc(`agentUsers/${ctx.user.uid}`);
+      const [saved,assignment,globalAgent]=await Promise.all([tx.get(ref),tx.get(ctx.ref),tx.get(globalAgentRef)]);const c=saved.data();
+      const previousCallPath=globalAgent.data()?.activeInboundCallPath;
+      if(previousCallPath && /^tenants\/[A-Za-z0-9_-]+\/callRecords\/[A-Za-z0-9_-]+$/.test(previousCallPath)) {
+        const previousCall=(await tx.get(db.doc(previousCallPath))).data();
+        if(previousCall?.agentUid===ctx.user.uid && ['dialing_agent','bridging_agent','in_progress','on_hold'].includes(previousCall.status))throw new HttpsError('already-exists','You already have an active call.');
+      }
+      if(globalAgent.data()?.agent_status==='busy')throw new HttpsError('already-exists','You already have an active call.');
       if(!c || c.direction!=='inbound' || c.brandId!==ctx.route.brandId || !canClaim(c,ctx.route,assignment.data()))throw new HttpsError('already-exists','This call is no longer available.');
       const lr=db.doc(`tenants/${ctx.tenantId}/leads/${c.leadId}`),lead=await tx.get(lr);
       if(lead.data()?.activeCallId)throw new HttpsError('failed-precondition','This lead already has an active call.');
+      tx.set(globalAgentRef,{agent_status:'busy',activeInboundCallPath:ref.path,presenceUpdatedAt:stamp()},{merge:true});
       tx.update(ref,{status:'dialing_agent',acceptedAt:stamp(),agentUid:ctx.user.uid,agentSipDestination:sip,agentDeadline:Timestamp.fromMillis(Date.now()+25000)});
       tx.update(ctx.ref,{agentStatus:'busy',statusChangedAt:stamp(),presenceUpdatedAt:stamp()});tx.create(db.collection('gmsAgentPresenceEvents').doc(),{tenantId:ctx.tenantId,agentUid:ctx.user.uid,status:'busy',previousStatus:assignment.data().agentStatus,previousDurationSeconds:assignment.data().statusChangedAt?.toMillis?Math.max(0,Math.floor((Date.now()-assignment.data().statusChangedAt.toMillis())/1000)):null,occurredAt:stamp()});tx.update(lr,{activeCallId:ref.id});tx.update(db.doc(`gmsCallBindings/${ref.id}`),{agentUid:ctx.user.uid,agentSipDestination:sip});return c;
     });
