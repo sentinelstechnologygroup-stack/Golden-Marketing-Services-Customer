@@ -22,16 +22,23 @@ service cloud.firestore {
     function agentAssigned(tenantId) {
       return signedIn()
         && exists(/databases/$(database)/documents/agentUsers/$(request.auth.uid)/assignments/$(tenantId))
-        && get(/databases/$(database)/documents/agentUsers/$(request.auth.uid)/assignments/$(tenantId)).data.status == 'active';
+        && grantIsActive(get(/databases/$(database)/documents/agentUsers/$(request.auth.uid)/assignments/$(tenantId)).data);
+    }
+
+    function grantIsActive(assignment) {
+      return assignment.status == 'active'
+        && (!('enabled' in assignment) || assignment.enabled == true)
+        && (!('revokedAt' in assignment) || assignment.revokedAt == null)
+        && (!('effectiveAt' in assignment) || assignment.effectiveAt == null || (assignment.effectiveAt is timestamp && assignment.effectiveAt <= request.time))
+        && (!('expiresAt' in assignment) || (assignment.expiresAt is timestamp && assignment.expiresAt > request.time));
     }
 
     function agentBrandAllowed(tenantId) {
       let assignment = get(/databases/$(database)/documents/agentUsers/$(request.auth.uid)/assignments/$(tenantId)).data;
-      return !('brandId' in resource.data)
-        || !('brandId' in assignment)
-        || assignment.brandId == null
-        || resource.data.brandId == assignment.brandId
-        || (('brandIds' in assignment) && assignment.brandIds.hasAny([resource.data.brandId]));
+      let brands = assignment.get('brandIds', []);
+      let brand = assignment.get('brandId', null);
+      return (brand == null && brands.size() == 0)
+        || (('brandId' in resource.data) && (resource.data.brandId == brand || brands.hasAny([resource.data.brandId])));
     }
 
     function canAccessTenant(tenantId) {
@@ -58,6 +65,11 @@ service cloud.firestore {
       return collection in ['organizations', 'brands', 'campaigns', 'leadSources', 'scripts', 'qualificationForms', 'routingRules', 'phoneNumbers'];
     }
 
+    // Communications and media always use fresh callable authorization.
+    function communicationsCollection(collection) {
+      return collection in ['callRecords', 'callTranscripts'];
+    }
+
     match /tenants/{tenantId} {
       allow read: if canAccessTenant(tenantId);
       allow write: if gmsSuperAdmin() || (membership(tenantId) && role(tenantId) in ['admin', 'client_admin']);
@@ -75,11 +87,16 @@ service cloud.firestore {
       match /{collection}/{documentId} {
         allow read: if canAccessTenant(tenantId)
           && (gmsSuperAdmin() || (collection != 'integrations' && !(collection == 'config' && documentId == 'onboarding')))
+          && !communicationsCollection(collection)
+          && !(collection == 'followUpTasks' && resource.data.get('task_type', '') in ['callback', 'callback_reminder'])
           && collection != 'members'
           && collection != 'auditLogs'
           && (!agentAssigned(tenantId) || gmsSuperAdmin() || membership(tenantId) || agentBrandAllowed(tenantId))
           && (gmsSuperAdmin() || agentAssigned(tenantId) || (membership(tenantId) && (role(tenantId) in ['admin', 'supervisor', 'client_admin', 'client_supervisor', 'auditor'] || (role(tenantId) in ['customer', 'client'] && customerReadable(collection)))));
         allow create: if membership(tenantId)
+          && !(collection == 'followUpTasks' && request.resource.data.get('task_type', '') in ['callback', 'callback_reminder'])
+          && collection != 'phoneNumbers'
+          && !communicationsCollection(collection)
           && collection != 'members'
           && collection != 'auditLogs'
           && tenantData(tenantId)
@@ -87,7 +104,10 @@ service cloud.firestore {
             || (role(tenantId) in ['admin', 'supervisor', 'client_admin', 'client_supervisor'] && configurationCollection(collection))
             || (role(tenantId) in ['admin', 'client_admin'] && collection in ['support', 'documents']));
         allow update: if membership(tenantId)
+          && !(collection == 'followUpTasks' && (resource.data.get('task_type', '') in ['callback', 'callback_reminder'] || request.resource.data.get('task_type', '') in ['callback', 'callback_reminder']))
+          && collection != 'phoneNumbers'
           && (!('managedBy' in resource.data) || resource.data.managedBy != 'onboarding')
+          && !communicationsCollection(collection)
           && collection != 'members'
           && collection != 'auditLogs'
           && resource.data.tenantId == tenantId
@@ -96,8 +116,11 @@ service cloud.firestore {
             || (role(tenantId) in ['admin', 'supervisor', 'client_admin', 'client_supervisor'] && configurationCollection(collection))
             || (role(tenantId) in ['admin', 'client_admin'] && collection in ['support', 'documents']));
         allow delete: if membership(tenantId)
+          && !(collection == 'followUpTasks' && resource.data.get('task_type', '') in ['callback', 'callback_reminder'])
+          && collection != 'phoneNumbers'
           && !(collection in ['config', 'integrations', 'campaignApprovals'])
           && (!('managedBy' in resource.data) || resource.data.managedBy != 'onboarding')
+          && !communicationsCollection(collection)
           && collection != 'members'
           && collection != 'auditLogs'
           && role(tenantId) in ['admin', 'client_admin'];
@@ -110,11 +133,11 @@ service cloud.firestore {
     }
 
     match /agentUsers/{uid} {
-      allow read: if signedIn() && uid == request.auth.uid;
-      allow write: if false;
+      allow read, write: if false;
       match /assignments/{tenantId} {
-        allow read: if signedIn() && uid == request.auth.uid;
-        allow write: if false;
+        // Legacy assignments may still contain provider credential identifiers.
+        // Only the sanitized getMyProfile/permissions callables expose grants.
+        allow read, write: if false;
       }
     }
 

@@ -16,7 +16,7 @@ verified against Telnyx before activation, and assigned under the correct
 tenants/{tenantId}/phoneNumbers record and brandId. Campaign-specific numbers
 take precedence; ambiguous assignments reject dialing.
 
-Agent assignment telnyxCredentialId stays server-side. Only short-lived calling
+User-level telephonyIdentities/{uid}.telnyxCredentialId stays server-side; legacy assignment credentials are not used for registration. Only short-lived calling
 tokens enter browser memory. Browser state cannot authorize provider call
 binding or recording. Signed webhooks correlate a matching connection, tenant,
 number and destination; recording requires the stored policy and consent.
@@ -30,6 +30,6 @@ Deploy from firebase/firebase.json using the production project
 gms-prod-1089114348316. If Firebase CLI login fails, gcloud can deploy
 these same second-generation functions. Keep calling disabled during deployment.
 
-Inbound dispatch, voicemail, SMS delivery/opt-out callbacks, token refresh,
-transcription and conference handoff still require separate implementation and
-validation. Do not infer readiness from successful builds or an API key.
+Assignment authorization, unified queues and signed inbound SIP dispatch are implemented in multiclient.cjs and remain gated pending provider acceptance. Inbound voicemail capture/timeouts, SMS delivery/opt-out callbacks, token refresh, transcription and conference handoff still require separate integration and validation. Do not infer readiness from successful builds or an API key.
+
+See ../../docs/multiclient-operations-acceptance.md for migration, automated evidence and remaining acceptance gates. TELEPHONY_INBOUND_ENABLED also defaults to false.

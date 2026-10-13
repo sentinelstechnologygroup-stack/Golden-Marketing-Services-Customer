@@ -143,9 +143,9 @@ test('Agent supervisors remain limited to their assigned tenant and Brands', asy
 
   const storage = env.authenticatedContext('assigned-supervisor').storage();
   const bytes = new Uint8Array([76, 77, 83]);
-  await assertSucceeds(uploadBytes(ref(storage, 'tenants/tenant-supervised/brands/brand-a/recordings/supervisor.txt'), bytes, { contentType: 'text/plain' }));
-  await assertFails(uploadBytes(ref(storage, 'tenants/tenant-supervised/brands/brand-b/recordings/supervisor.txt'), bytes, { contentType: 'text/plain' }));
-  await assertFails(uploadBytes(ref(storage, 'tenants/tenant-other/brands/brand-a/recordings/supervisor.txt'), bytes, { contentType: 'text/plain' }));
+  await assertSucceeds(uploadBytes(ref(storage, 'tenants/tenant-supervised/brands/brand-a/attachments/supervisor.txt'), bytes, { contentType: 'text/plain' }));
+  await assertFails(uploadBytes(ref(storage, 'tenants/tenant-supervised/brands/brand-b/attachments/supervisor.txt'), bytes, { contentType: 'text/plain' }));
+  await assertFails(uploadBytes(ref(storage, 'tenants/tenant-other/brands/brand-a/attachments/supervisor.txt'), bytes, { contentType: 'text/plain' }));
 });
 
 test('browser-supplied tenant ownership cannot grant direct lead writes', async () => {
@@ -220,8 +220,8 @@ test('Storage limits assigned agents to their Brand path', async () => {
   });
   const storage = env.authenticatedContext('storage-agent').storage();
   const bytes = new Uint8Array([76, 77, 83]);
-  await assertSucceeds(uploadBytes(ref(storage, 'tenants/tenant-storage-brand/brands/brand-a/recordings/call-a.txt'), bytes, { contentType: 'text/plain' }));
-  await assertFails(uploadBytes(ref(storage, 'tenants/tenant-storage-brand/brands/brand-b/recordings/call-b.txt'), bytes, { contentType: 'text/plain' }));
+  await assertSucceeds(uploadBytes(ref(storage, 'tenants/tenant-storage-brand/brands/brand-a/attachments/call-a.txt'), bytes, { contentType: 'text/plain' }));
+  await assertFails(uploadBytes(ref(storage, 'tenants/tenant-storage-brand/brands/brand-b/attachments/call-b.txt'), bytes, { contentType: 'text/plain' }));
   await assertFails(uploadBytes(ref(storage, 'tenants/tenant-storage-brand/documents/legacy.txt'), bytes, { contentType: 'text/plain' }));
 });
 
@@ -254,4 +254,18 @@ test('creative file paths are immutable: replacement requires a new document/ver
     await setDoc(doc(context.firestore(),'tenants/cabinet/documents/creative'),{tenantId:'cabinet',managedBy:'onboarding'});
   });
   await assertFails(uploadBytes(file,new Uint8Array([2]),{contentType:'text/plain'}));
+});
+
+test('calling identities, raw call media and operational assignments are callable-only', async () => {
+  await env.withSecurityRulesDisabled(async context => {
+    const db = context.firestore();
+    await setDoc(doc(db, 'telephonyIdentities/media-admin'), { telnyxCredentialId: 'never-browser-readable' });
+    await setDoc(doc(db, 'agentUsers/media-admin/assignments/media-tenant'), { status: 'active', telnyxCredentialId: 'legacy-private' });
+    await setDoc(doc(db, 'tenants/media-tenant/callRecords/media-call'), { tenantId: 'media-tenant', recordingUrl: 'https://media.telnyx.com/private.wav' });
+  });
+  const context = env.authenticatedContext('media-admin', { gmsSuperAdmin: true });
+  for (const path of ['telephonyIdentities/media-admin', 'agentUsers/media-admin/assignments/media-tenant', 'tenants/media-tenant/callRecords/media-call'])
+    await assertFails(getDoc(doc(context.firestore(), path)));
+  for (const path of ['tenants/media-tenant/recordings/test.wav', 'tenants/media-tenant/brands/brand/recordings/test.wav'])
+    await assertFails(uploadBytes(ref(context.storage(), path), new Uint8Array([1]), { contentType: 'audio/wav' }));
 });

@@ -30,10 +30,10 @@ service firebase.storage {
         && request.resource.contentType.matches('application/pdf|image/.*|audio/.*|video/mp4|text/.*|application/json|application/zip|application/msword|application/vnd.ms-excel|application/vnd.openxmlformats-officedocument.*');
     }
 
-    match /tenants/{tenantId}/brands/{brandId}/{allPaths=**} {
-      allow read: if gmsSuperAdmin() || member(tenantId) || assignedBrand(tenantId, brandId);
-      allow create, update: if (gmsSuperAdmin() || member(tenantId) || assignedBrand(tenantId, brandId)) && supportedFile();
-      allow delete: if gmsSuperAdmin() || member(tenantId);
+    match /tenants/{tenantId}/brands/{brandId}/{folder}/{allPaths=**} {
+      allow read: if !(folder in ['recordings', 'voicemail']) && (gmsSuperAdmin() || member(tenantId) || assignedBrand(tenantId, brandId));
+      allow create, update: if !(folder in ['recordings', 'voicemail']) && (gmsSuperAdmin() || member(tenantId) || assignedBrand(tenantId, brandId)) && supportedFile();
+      allow delete: if !(folder in ['recordings', 'voicemail']) && (gmsSuperAdmin() || member(tenantId));
     }
 
     match /tenants/{tenantId}/documents/{documentId}/{allPaths=**} {
@@ -44,9 +44,9 @@ service firebase.storage {
     }
 
     match /tenants/{tenantId}/{folder}/{allPaths=**} {
-      allow read: if gmsSuperAdmin() || member(tenantId);
-      allow create, update: if folder != 'documents' && (gmsSuperAdmin() || member(tenantId)) && supportedFile();
-      allow delete: if folder != 'documents' && (gmsSuperAdmin() || member(tenantId));
+      allow read: if !(folder in ['recordings', 'voicemail', 'brands']) && (gmsSuperAdmin() || member(tenantId));
+      allow create, update: if !(folder in ['documents', 'recordings', 'voicemail', 'brands']) && (gmsSuperAdmin() || member(tenantId)) && supportedFile();
+      allow delete: if !(folder in ['documents', 'recordings', 'voicemail', 'brands']) && (gmsSuperAdmin() || member(tenantId));
     }
 
     match /{allPaths=**} { allow read, write: if false; }

@@ -77,7 +77,7 @@ test('existing-route ingestion, Agent workflow, Customer projection, and Brand i
     db.doc(`tenants/${tenantId}/brands/${brandId}`).set({tenantId,brandId,name:'Workflow brand',status:'active'}),
     db.doc(`tenants/${tenantId}/members/${clientUid}`).set({tenantId,uid:clientUid,email:'workflow-client@example.test',role:'client_admin',active:true}),
     db.doc(`tenants/${tenantId}/businessOwners/${clientUid}`).set({tenantId,brandId,uid:clientUid,memberUid:clientUid,name:'Client contact',email:'workflow-client@example.test',phone:'+15555550200',routingEligible:true,status:'active'}),
-    db.doc(`agentUsers/${agentUid}/assignments/${tenantId}`).set({tenantId,agentUid,brandId,brandIds:[brandId],role:'agent',status:'active',scope:'assigned'}),
+    db.doc(`agentUsers/${agentUid}/assignments/${tenantId}`).set({tenantId,agentUid,brandId,brandIds:[brandId],role:'agent',status:'active',scope:'assigned',capabilities:['call','read_communications'],lineIds:['workflow-line']}),
     db.doc('ingestionRoutes/workflow-bridge-route').set(route),
     db.doc(`tenants/${tenantId}/config/workflow`).set({notificationProfile:{channels:['in_app']}}),
   ]);
@@ -152,6 +152,7 @@ test('existing-route ingestion, Agent workflow, Customer projection, and Brand i
     })),
     (error) => error.code === 'permission-denied',
   );
+  await db.doc(`tenants/${tenantId}/phoneNumbers/workflow-line`).set({tenantId,brandId,environment:'production',provider:'telnyx',status:'active',verified:true,phoneNumber:'+15555550300'});
   await functions.communications.run(agentRequest({ action: 'claim_lead', params: { leadId } }));
   await assert.rejects(
     functions.communications.run(agentRequest({
