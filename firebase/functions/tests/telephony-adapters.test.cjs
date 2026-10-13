@@ -47,3 +47,12 @@ test('Telnyx browser tokens require a provisioned agent and never return the API
  const session=await browserSession('telnyx',{token:'private-api-key'},'agent',{telnyxCredentialId:'credential'},async(url,opts)=>{assert.match(url,/telephony_credentials\/credential\/token$/);assert.equal(opts.headers.Authorization,'Bearer private-api-key');return {ok:true,text:async()=>'short-lived-token'};});
  assert.equal(session.token,'short-lived-token');assert.doesNotMatch(JSON.stringify(session),/private-api-key/);
 });
+test('inbound dialing carries server state and bridges only named legs with idempotent commands', async () => {
+ const requests=[];
+ const api=createProvider('telnyx',{token:'private-token',connectionId:'connection'},async(url,options)=>{requests.push({url,options});return {ok:true,json:async()=>({data:{call_control_id:'leg'}})};});
+ await api.start({to:'sip:agent@sip.telnyx.com',from:'+15550000001',callbackUrl:'https://example.test/webhook',commandId:'command-one',clientState:'c3RhdGU='});
+ assert.equal(JSON.parse(requests[0].options.body).client_state,'c3RhdGU=');
+ await api.bridge('inbound','agent-leg','bridge-command');
+ assert.match(requests[1].url,/calls\/inbound\/actions\/bridge$/);
+ assert.deepEqual(JSON.parse(requests[1].options.body),{call_control_id:'agent-leg',command_id:'bridge-command',prevent_double_bridge:true});
+});

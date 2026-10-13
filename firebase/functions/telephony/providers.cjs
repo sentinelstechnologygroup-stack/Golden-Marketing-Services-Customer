@@ -12,7 +12,8 @@ function createProvider(name,config,transport=fetch){
  const callPath=id=>'/calls/'+encodeURIComponent(id)+'/actions';
  const conferencePath=id=>'/conferences/'+encodeURIComponent(id)+'/actions';
  return {name,
-  async start({to,from,callbackUrl,commandId}){required({from,callbackUrl},['from','callbackUrl']);const result=await request('/calls',{to,from,connection_id:config.connectionId,webhook_url:callbackUrl,command_id:commandId});return {id:result.call_control_id,status:result.status||'queued'};},
+  async start({to,from,callbackUrl,commandId,clientState}){required({from,callbackUrl},['from','callbackUrl']);const result=await request('/calls',{to,from,connection_id:config.connectionId,webhook_url:callbackUrl,command_id:commandId,...(clientState?{client_state:clientState}:{})});return {id:result.call_control_id,status:result.status||'queued'};},
+  bridge:(id,other,commandId)=>request(callPath(id)+'/bridge',{call_control_id:other,command_id:commandId,prevent_double_bridge:true}),
   end:id=>request(callPath(id)+'/hangup'),
   holdCall:(id,hold)=>request(callPath(id)+(hold?'/hold':'/unhold')),
   answer:id=>request(callPath(id)+'/answer'),

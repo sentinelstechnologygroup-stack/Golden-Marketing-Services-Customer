@@ -18,6 +18,9 @@ function phoneProvider() {
   return createProvider(name, {token:telnyxApiKey.value(),connectionId:process.env.TELNYX_CONNECTION_ID});
 }
 
+const { createMulticlient, PHONE_ACTIONS, activeGrant } = require('./telephony/multiclient.cjs');
+const operations = createMulticlient({ db, auth, HttpsError, FieldValue, provider: () => ({ ...phoneProvider(), token: telnyxApiKey.value() }) });
+
 const ROLE_ALIASES = new Map([
   ['customer', 'client'],
   ['admin', 'client_admin'],
@@ -112,12 +115,15 @@ async function requireMembership(request, tenantId, roles = null) {
 
 async function requireAgentAssignment(request, tenantId, roles = ['agent', 'client_supervisor', 'client_admin', 'gms_super_admin']) {
   const caller = requireAuth(request);
+  if (typeof tenantId !== 'string' || !tenantId || tenantId.includes('/')) throw new HttpsError('invalid-argument', 'Invalid tenant.');
+  const currentActor = await operations.identity(request);
+  await operations.tenant(tenantId, operations.deploymentEnvironment(request.data?.environment));
   const membership = await getMembership(tenantId, caller.uid);
-  if (caller.token?.gmsSuperAdmin === true) return { caller, membership: { uid: caller.uid, tenantId, role: 'gms_super_admin', active: true }, assignment: null };
+  if (currentActor.superAdmin) return { caller, membership: { uid: caller.uid, tenantId, role: 'gms_super_admin', active: true }, assignment: null };
   if (membership && TENANT_ADMIN_ROLES.includes(normalizeRole(membership.role)) && roleAllowed(membership.role, roles)) return { caller, membership, assignment: null };
   const assignment = await db.doc(`agentUsers/${caller.uid}/assignments/${tenantId}`).get();
   const data = assignment.exists ? assignment.data() : null;
-  if (!data || data.status !== 'active' || !roleAllowed(data.role || 'agent', roles)) throw new HttpsError('permission-denied', 'An active agent assignment is required for this tenant.');
+  if (!activeGrant(data) || !roleAllowed(data.role || 'agent', roles)) throw new HttpsError('permission-denied', 'An active agent assignment is required for this tenant.');
   return { caller, membership: data, assignment: data };
 }
 
@@ -214,12 +220,16 @@ exports.getMyProfile = onCall({ enforceAppCheck: false }, async (request) => {
     db.collectionGroup('members').where('uid', '==', caller.uid).where('active', '==', true).get(),
     db.collection(`agentUsers/${caller.uid}/assignments`).where('status', '==', 'active').get(),
   ]);
-  const agentAssignments = await Promise.all(assignments.docs.map(async (assignmentDoc) => {
+  const currentActor = await operations.identity(request);
+  const safeAssignments = currentActor.superAdmin
+    ? (await db.collection('tenants').get()).docs.filter(doc => require('./telephony/multiclient.cjs').environmentOf(doc.data()) === 'production' && !['disabled', 'inactive', 'archived'].includes(doc.data().status)).map(doc => ({ id: doc.id, data: () => ({ tenantId: doc.id, status: 'active', role: 'gms_super_admin' }) }))
+    : assignments.docs.filter(doc => activeGrant(doc.data()));
+  const agentAssignments = await Promise.all(safeAssignments.map(async (assignmentDoc) => {
     const assignment = assignmentDoc.data();
     const tenant = await db.doc(`tenants/${assignment.tenantId || assignmentDoc.id}`).get();
     return {
       id: assignmentDoc.id,
-      ...assignment,
+      ...Object.fromEntries(Object.entries(assignment).filter(([key]) => !['telnyxCredentialId', 'sipUri'].includes(key))),
       tenantId: assignment.tenantId || assignmentDoc.id,
       tenantName: tenant.data()?.name || assignment.tenantName || assignment.tenantId || assignmentDoc.id,
       tenantStatus: tenant.data()?.status || 'active',
@@ -236,7 +246,7 @@ exports.getMyProfile = onCall({ enforceAppCheck: false }, async (request) => {
     locale: profile.data()?.locale || null,
     disabled: user.disabled,
     mustChangePassword: user.customClaims?.mustChangePassword === true,
-    gmsSuperAdmin: caller.token?.gmsSuperAdmin === true,
+    gmsSuperAdmin: currentActor.superAdmin,
     memberships: memberships.docs.map((doc) => ({ id: doc.id, ...doc.data(), role: normalizeRole(doc.data().role) })),
     agentAssignments,
   };
@@ -592,23 +602,42 @@ exports.getLiveReport = onCall({ enforceAppCheck: false }, async (request) => {
 
 exports.getAgentCollection = onCall({ enforceAppCheck: false }, async (request) => {
   const { tenantId, collectionName, limit: requestedLimit = 200 } = request.data || {};
+  if (!tenantId) {
+    const context = await operations.scope(request);
+    if (!AGENT_COLLECTIONS.has(collectionName)) throw new HttpsError('invalid-argument', 'Collection is not available through the CRM API.');
+    if (collectionName === 'callRecords') { const result = await operations.queue(request); return { rows: result.items, cursor: result.cursor }; }
+    const rows = [];
+    for (const grant of context.grants) {
+      const result = await exports.getAgentCollection.run({ ...request, data: { ...request.data, tenantId: grant.tenantId } });
+      rows.push(...result.rows.map(row => ({ ...row, tenantId: grant.tenantId, clientName: grant.tenant.name || grant.tenantId })));
+    }
+    return { rows };
+  }
   const { assignment } = await requireAgentAssignment(request, tenantId, ['admin', 'supervisor', 'agent', 'auditor']);
+  if (collectionName === 'callRecords') {
+    const result = await operations.queue({ ...request, data: { ...request.data, kind: collectionName === 'callRecords' ? 'calls' : 'callbacks' } });
+    return { rows: result.items, cursor: result.cursor };
+  }
   if (!AGENT_COLLECTIONS.has(collectionName)) throw new HttpsError('invalid-argument', 'Collection is not available through the CRM API.');
   const pageSize = Math.min(Math.max(Number(requestedLimit) || 200, 1), 500);
   const snapshot = await db.collection(`tenants/${tenantId}/${collectionName}`).where('tenantId', '==', tenantId).limit(pageSize).get();
+  const communicationScope = collectionName === 'followUpTasks' ? await operations.scope(request).catch(error => { if (error.code !== 'permission-denied') throw error; return { superAdmin: false, grants: [] }; }) : null;
   const rows = snapshot.docs
     .map((item) => ({ id: item.id, ...item.data() }))
-    .filter((item) => item.archived !== true && assignmentAllowsBrand(assignment, recordBrandId(item)));
+    .filter((item) => item.archived !== true && assignmentAllowsBrand(assignment, recordBrandId(item)))
+    .filter((item) => !communicationScope || !['callback', 'callback_reminder'].includes(item.task_type || item.taskType) || communicationScope.superAdmin || require('./telephony/multiclient.cjs').grantAllows(communicationScope.grants[0]?.assignment, item, 'read_communications'));
   return { rows };
 });
 
 exports.createAgentRecord = onCall({ enforceAppCheck: true }, async (request) => {
   const { tenantId, collectionName, data } = request.data || {};
+  if (collectionName === 'callRecords' || (collectionName === 'followUpTasks' && ['callback', 'callback_reminder'].includes(data?.task_type || data?.taskType))) throw new HttpsError('permission-denied', 'Use the authorized communications workflow.');
   if (!AGENT_COLLECTIONS.has(collectionName) || collectionName === 'auditLogs') throw new HttpsError('invalid-argument', 'Collection is not writable through the CRM API.');
   const roles = writeRolesFor(collectionName);
   if (!roles.length) throw new HttpsError('permission-denied', 'This collection is not writable through the CRM API.');
   const authorization = await requireAgentAssignment(request, tenantId, roles);
   const input = applyAssignmentBrand(authorization.assignment, collectionName, data);
+  if (collectionName === 'phoneNumbers') input.verified = false;
   validateRequiredFields(collectionName, input);
   if (collectionName === 'leads' && INDUSTRY_POLICY_FIELDS.some((field) => input[field] === undefined && field !== 'receivedAt')) throw new HttpsError('invalid-argument', 'Lead workflow metadata is required.');
   return createTenantRecord({ request, tenantId, collectionName, roles, authorize: requireAgentAssignment, authorization, action: `crm.${collectionName}.created`, data: input });
@@ -616,6 +645,7 @@ exports.createAgentRecord = onCall({ enforceAppCheck: true }, async (request) =>
 
 exports.updateAgentRecord = onCall({ enforceAppCheck: true }, async (request) => {
   const { tenantId, collectionName, recordId, data } = request.data || {};
+  if (collectionName === 'callRecords' || (collectionName === 'followUpTasks' && ['callback', 'callback_reminder'].includes(data?.task_type || data?.taskType))) throw new HttpsError('permission-denied', 'Use the authorized communications workflow.');
   if (!AGENT_COLLECTIONS.has(collectionName) || collectionName === 'auditLogs' || typeof recordId !== 'string' || !recordId) throw new HttpsError('invalid-argument', 'A valid writable collection and recordId are required.');
   const roles = writeRolesFor(collectionName);
   if (!roles.length) throw new HttpsError('permission-denied', 'This collection is not writable through the CRM API.');
@@ -623,9 +653,11 @@ exports.updateAgentRecord = onCall({ enforceAppCheck: true }, async (request) =>
   const recordRef = db.doc(`tenants/${tenantId}/${collectionName}/${recordId}`);
   const current = await recordRef.get();
   if (!current.exists || current.data().tenantId !== tenantId) throw new HttpsError('not-found', 'Record not found.');
+  if (collectionName === 'followUpTasks' && ['callback', 'callback_reminder'].includes(current.data().task_type || current.data().taskType)) throw new HttpsError('permission-denied', 'Use the authorized callback workflow.');
   if (current.data().managedBy === 'onboarding') throw new HttpsError('failed-precondition', 'Update this configuration in Agent Portal > Clients > onboarding.');
   requireAssignmentBrand(assignment, recordBrandId(current.data()));
   const patch = stripImmutablePatch(data);
+  if (collectionName === 'phoneNumbers') patch.verified = false;
   await recordRef.update({ ...patch, updatedAt: FieldValue.serverTimestamp(), updatedBy: caller.uid });
   await recordAudit({ tenantId, actorUid: caller.uid, action: `crm.${collectionName}.updated`, target: recordId });
   return { id: recordId, ...current.data(), ...patch };
@@ -634,7 +666,10 @@ exports.updateAgentRecord = onCall({ enforceAppCheck: true }, async (request) =>
 exports.createAgentAssignment = onCall({ enforceAppCheck: true }, async (request) => {
   const { tenantId, agentUid, industry, brandId = null, campaignIds = [], sourceIds = [], scope = 'assigned', permissions = [], role = 'agent' } = request.data || {};
   const assignmentRole = role === 'supervisor' ? 'supervisor' : 'agent';
-  const { caller } = await requireMembership(request, tenantId, assignmentRole === 'supervisor' ? ['admin'] : ['admin', 'supervisor']);
+  const actor = await operations.identity(request);
+  if (!actor.superAdmin) throw new HttpsError('permission-denied', 'Only GMS Super Admin can manage agent assignments.');
+  const caller = { uid: actor.uid };
+  if (typeof tenantId !== 'string' || !tenantId || tenantId.includes('/')) throw new HttpsError('invalid-argument', 'Invalid tenant.');
   if (typeof agentUid !== 'string' || !agentUid || typeof industry !== 'string' || !industry) throw new HttpsError('invalid-argument', 'agentUid and industry are required.');
   const user = await auth.getUser(agentUid).catch(() => null);
   if (!user || user.disabled) throw new HttpsError('not-found', 'Agent account is unavailable.');
@@ -651,7 +686,9 @@ exports.createAgentAssignment = onCall({ enforceAppCheck: true }, async (request
 
 exports.revokeAgentAssignment = onCall({ enforceAppCheck: true }, async (request) => {
   const { tenantId, agentUid, assignmentId } = request.data || {};
-  const { caller } = await requireMembership(request, tenantId, ['admin', 'supervisor']);
+  const actor = await operations.identity(request);
+  if (!actor.superAdmin) throw new HttpsError('permission-denied', 'Only GMS Super Admin can revoke agent assignments.');
+  const caller = { uid: actor.uid };
   if (typeof agentUid !== 'string' || typeof assignmentId !== 'string') throw new HttpsError('invalid-argument', 'agentUid and assignmentId are required.');
   const assignmentSnapshot = await db.doc(`agentAssignments/${assignmentId}`).get();
   if (!assignmentSnapshot.exists || assignmentSnapshot.data().tenantId !== tenantId || assignmentSnapshot.data().agentUid !== agentUid) {
@@ -739,27 +776,24 @@ exports.appointmentWorkflow = onCall({ enforceAppCheck: true }, async (request) 
 
 exports.communications = onCall({ enforceAppCheck: true, secrets: [telnyxApiKey] }, async (request) => {
   const { tenantId, action, params = {}, adminCheck = false } = request.data || {};
+  if (['send_sms', 'start_recording'].includes(action)) throw new HttpsError('failed-precondition', 'This action requires a separately verified provider workflow.');
+  if (PHONE_ACTIONS.has(action)) return operations.phone(request, action, params);
   if (typeof tenantId!=='string' || !tenantId || tenantId.includes('/')) throw new HttpsError('invalid-argument','Invalid tenant.');
   for (const id of [params.callId,params.leadId]) if (id !== undefined && (typeof id!=='string' || !id || id.includes('/'))) throw new HttpsError('invalid-argument','Invalid record identifier.');
-  const roles = adminCheck ? ['admin', 'supervisor'] : ['admin', 'supervisor', 'agent'];
-  const { caller, assignment } = await requireAgentAssignment(request, tenantId, roles);
+  const context = await operations.scope(request, 'call');
+  const assignment = context.grants.find(grant => grant.tenantId === tenantId)?.assignment || null;
+  const caller = { uid: context.uid };
+  if (adminCheck && !context.superAdmin && !['admin', 'supervisor', 'client_admin', 'client_supervisor'].includes(assignment?.role)) throw new HttpsError('permission-denied', 'Administrative access required.');
   if (!['health_check', 'start_call', 'bind_call', 'end_call', 'hold_call', 'resume_call', 'warm_transfer', 'claim_lead', 'release_lead', 'set_availability', 'start_consultation', 'complete_transfer', 'cancel_transfer', 'mute_call', 'browser_session', 'send_sms', 'start_recording', 'call_status'].includes(action)) throw new HttpsError('invalid-argument', 'Unsupported communications action.');
-  if (action === 'health_check') {
-    try { const provider = phoneProvider(); const issues = require('./telephony/readiness.cjs').configurationIssues(process.env); const healthy = process.env.TELEPHONY_ENABLED === 'true' && issues.length === 0; return {ok:true, configured:issues.length===0, healthy, mode:healthy?'production':'unavailable', provider:provider.name, recordingPolicy:process.env.DEFAULT_RECORDING_POLICY || 'record_on_consent', warmTransferEnabled:healthy && process.env.TELEPHONY_WARM_TRANSFER_ENABLED==='true', actorUid:caller.uid, ...(!healthy?{warning:'Calling is awaiting verified phone-service configuration.'}:{})}; }
-    catch { return {ok:true,configured:false,healthy:false,mode:'unavailable',warning:'Calling is awaiting phone-service configuration.'}; }
-  }
-  if (action === 'set_availability') {
-    if (!['offline','available','away','after_call_work'].includes(params.status)) throw new HttpsError('invalid-argument','Invalid availability.');
-    await db.doc(`agentUsers/${caller.uid}/assignments/${tenantId}`).set({agentStatus:params.status,presenceUpdatedAt:FieldValue.serverTimestamp()},{merge:true});
-    return {ok:true,status:params.status};
-  }
   if (action === 'claim_lead' || action === 'release_lead') {
     if (typeof params.leadId !== 'string' || !params.leadId || params.leadId.includes('/')) throw new HttpsError('invalid-argument','A lead is required.');
     const ref = db.doc(`tenants/${tenantId}/leads/${params.leadId}`);
     await db.runTransaction(async tx => {
       const snapshot = await tx.get(ref);
       if (!snapshot.exists || snapshot.data().tenantId!==tenantId) throw new HttpsError('not-found','Lead not found.');
-      const lead = snapshot.data(); requireAssignmentBrand(assignment,recordBrandId(lead));
+      const lead = snapshot.data();
+      await operations.authorizeLead(request, tenantId, lead);
+      requireAssignmentBrand(assignment,recordBrandId(lead));
       const owner = lead.queueOwnerUid;
       const expires = lead.queueLeaseExpiresAt?.toMillis?.() || 0;
       if (owner && owner!==caller.uid && expires>Date.now()) throw new HttpsError('already-exists','Another agent accepted this request.');
@@ -770,24 +804,18 @@ exports.communications = onCall({ enforceAppCheck: true, secrets: [telnyxApiKey]
     await recordAudit({tenantId,actorUid:caller.uid,action:`telephony.${action}`,target:params.leadId});
     return {ok:true,leadId:params.leadId};
   }
+  operations.activation(context.environment);
   if (process.env.TELEPHONY_ENABLED !== 'true') throw new HttpsError('failed-precondition','Calling has not been activated.');
   if (require('./telephony/readiness.cjs').configurationIssues(process.env).length) throw new HttpsError('failed-precondition','Phone-service configuration has not passed activation checks.');
   if (['warm_transfer','start_consultation','complete_transfer','cancel_transfer'].includes(action) && process.env.TELEPHONY_WARM_TRANSFER_ENABLED !== 'true') throw new HttpsError('failed-precondition','Warm transfer has not passed end-to-end verification.');
   let provider;
   try { provider = phoneProvider(); } catch { throw new HttpsError('failed-precondition', 'Phone service is not configured.'); }
-  if(action==='browser_session') {
-    const provision=await db.doc(`agentUsers/${caller.uid}/assignments/${tenantId}`).get();
-    const {browserSession}=require('./telephony/browser-session.cjs');
-    const name=provider.name;
-    const config={token:telnyxApiKey.value()};
-    try { return await browserSession(name,config,`gms_${caller.uid}`,provision.data() || {}); } catch { throw new HttpsError('failed-precondition','Agent browser calling is not provisioned.'); }
-  }
   const callSid = typeof params.callId === 'string' ? params.callId : '';
   if (!callSid && !['start_call','send_sms'].includes(action)) throw new HttpsError('invalid-argument', 'A callId is required.');
   if (action==='bind_call' || action==='call_status') {
     const ref=db.doc(`tenants/${tenantId}/callRecords/${callSid}`), snapshot=await ref.get();
     if(!snapshot.exists) throw new HttpsError('not-found','Call not found.');
-    const call=snapshot.data(); requireAssignmentBrand(assignment,recordBrandId(call));
+    const call=snapshot.data(); await operations.authorize(request, tenantId, call, 'call'); requireAssignmentBrand(assignment,recordBrandId(call));
     if(call.tenantId!==tenantId || call.agentUid!==caller.uid || call.provider!==provider.name) throw new HttpsError('permission-denied','Call ownership or provider mismatch.');
     if(action==='call_status') return {ok:true,callId:callSid,status:call.status,browserState:call.browserState || null,transferStatus:call.transferStatus || null,recordingStatus:call.recordingStatus || null};
     if(provider.name!=='telnyx') throw new HttpsError('failed-precondition','Browser call binding is only used by the selected phone service.');
@@ -802,6 +830,7 @@ exports.communications = onCall({ enforceAppCheck: true, secrets: [telnyxApiKey]
     const snapshot = await ref.get();
     if (!snapshot.exists) throw new HttpsError('not-found','Call not found.');
     const call = snapshot.data();
+    await operations.authorize(request, tenantId, call, 'call');
     requireAssignmentBrand(assignment,recordBrandId(call));
     if (call.tenantId!==tenantId || call.agentUid!==caller.uid || call.provider!==provider.name) throw new HttpsError('permission-denied','Call ownership or provider mismatch.');
     if (!call.conferenceId || !call.agentCallId) throw new HttpsError('failed-precondition','A connected conference is required for handoff controls.');
@@ -845,6 +874,8 @@ exports.communications = onCall({ enforceAppCheck: true, secrets: [telnyxApiKey]
     const leadSnapshot = await db.doc(`tenants/${tenantId}/leads/${leadId}`).get();
     if (!leadSnapshot.exists || leadSnapshot.data().tenantId !== tenantId) throw new HttpsError('not-found', 'Lead not found.');
     const leadData = leadSnapshot.data();
+    requireAssignmentBrand(assignment, recordBrandId(leadData));
+    await operations.authorizeLead(request, tenantId, leadData);
     brandId = recordBrandId(leadData);
     requireAssignmentBrand(assignment, brandId);
     if (leadData.queueOwnerUid !== caller.uid || (leadData.queueLeaseExpiresAt?.toMillis?.() || 0) < Date.now()) throw new HttpsError('failed-precondition','Accept this lead before calling.');
@@ -853,8 +884,9 @@ exports.communications = onCall({ enforceAppCheck: true, secrets: [telnyxApiKey]
     }
     const numbers = await db.collection(`tenants/${tenantId}/phoneNumbers`).where('brandId','==',brandId).get();
     let number;
-    try { number = require('./telephony/readiness.cjs').selectOutboundNumber(numbers.docs.map(doc=>doc.data()),provider.name,leadData.campaignId || leadData.campaign_id); }
+    try { number = require('./telephony/readiness.cjs').selectOutboundNumber(numbers.docs.map(doc=>({...doc.data(),lineId:doc.id})).filter(row=>row.verified===true && require('./telephony/multiclient.cjs').environmentOf(row)===context.environment),provider.name,leadData.campaignId || leadData.campaign_id); }
     catch { throw new HttpsError('failed-precondition','Configure one active outbound number for this Brand or campaign.'); }
+    await operations.authorize(request, tenantId, {...leadData, environment: context.environment, lineId: number.lineId}, 'call');
     if (!number?.phoneNumber) throw new HttpsError('failed-precondition','Configure an active client phone number for the selected provider.');
     if (leadData.disposition==='do_not_call' || leadData.doNotCall===true) throw new HttpsError('failed-precondition','This contact cannot be called.');
     const brandSnapshot=await db.doc(`tenants/${tenantId}/brands/${brandId}`).get();
@@ -879,7 +911,7 @@ exports.communications = onCall({ enforceAppCheck: true, secrets: [telnyxApiKey]
     }
     callRef = db.doc(`tenants/${tenantId}/callRecords/${callId}`);
     await callRef.set({
-      tenantId, brandId, campaignId:leadData.campaignId || leadData.campaign_id || null, leadId, agentUid: caller.uid, provider: provider.name, providerCallId: provider.name==='telnyx'?null:callId,
+      tenantId, environment: context.environment, lineId: number.lineId, brandId, campaignId:leadData.campaignId || leadData.campaign_id || null, leadId, agentUid: caller.uid, provider: provider.name, providerCallId: provider.name==='telnyx'?null:callId,
       clientContactId: leadData.routedClientContactId || null,
       from:number.phoneNumber, direction: 'outbound', destination: String(params.to).slice(0, 80), status: result.status || 'queued',
       recordingPolicy, recordingConsent:params.recordingConsent===true, recordingRequested:recordingPolicy!=='do_not_record', recordingStatus:null,
@@ -891,6 +923,7 @@ exports.communications = onCall({ enforceAppCheck: true, secrets: [telnyxApiKey]
     callRef = db.doc(`tenants/${tenantId}/callRecords/${callSid}`);
     const callSnapshot = await callRef.get();
     if (!callSnapshot.exists || callSnapshot.data().tenantId !== tenantId) throw new HttpsError('not-found', 'Call not found.');
+    await operations.authorize(request, tenantId, callSnapshot.data(), 'call');
     brandId = recordBrandId(callSnapshot.data());
     leadId = callSnapshot.data().leadId || '';
     requireAssignmentBrand(assignment, brandId);
@@ -901,6 +934,7 @@ exports.communications = onCall({ enforceAppCheck: true, secrets: [telnyxApiKey]
     callRef = db.doc(`tenants/${tenantId}/callRecords/${callSid}`);
     const callSnapshot = await callRef.get();
     if (!callSnapshot.exists || callSnapshot.data().tenantId !== tenantId) throw new HttpsError('not-found', 'Call not found.');
+    await operations.authorize(request, tenantId, callSnapshot.data(), 'call');
     brandId = recordBrandId(callSnapshot.data());
     leadId = callSnapshot.data().leadId || '';
     requireAssignmentBrand(assignment, brandId);
@@ -913,6 +947,7 @@ exports.communications = onCall({ enforceAppCheck: true, secrets: [telnyxApiKey]
     const callSnapshot = await callRef.get();
     if (!callSnapshot.exists || callSnapshot.data().tenantId !== tenantId) throw new HttpsError('not-found', 'Call not found.');
     const callData = callSnapshot.data();
+    await operations.authorize(request, tenantId, callData, 'call');
     brandId = recordBrandId(callData);
     leadId = callData.leadId || '';
     requireAssignmentBrand(assignment, brandId);
@@ -944,6 +979,18 @@ exports.communications = onCall({ enforceAppCheck: true, secrets: [telnyxApiKey]
   return { ok: true, action, callId, status: action==='end_call'?'ending':action==='hold_call'?'on_hold':action==='resume_call'?'in_progress':result.status || 'accepted', ...(result.dial?{dial:result.dial}:{}) };
 });
 
+exports.createCommunicationCallback = onCall({ enforceAppCheck: true }, request => operations.createCallback(request));
+exports.getIncomingCallContext = onCall({ enforceAppCheck: true }, request => operations.incomingContext(request));
+exports.getCommunicationsQueue = onCall({ enforceAppCheck: true }, request => operations.queue(request));
+exports.getCommunicationRecord = onCall({ enforceAppCheck: true }, async request => {
+  const { snapshot, context } = await operations.record(request);
+  return require('./telephony/multiclient.cjs').queueRow(snapshot, context.tenant);
+});
+exports.updateCommunicationsQueue = onCall({ enforceAppCheck: true }, request => operations.updateQueue(request));
+exports.getCommunicationMedia = onCall({ enforceAppCheck: true }, request => operations.media(request));
+exports.setOperationalGrant = onCall({ enforceAppCheck: true }, request => operations.permission(request));
+exports.getOperationalPermissions = onCall({ enforceAppCheck: true }, request => operations.permissionWorkspace(request));
+
 const { verifySignature } = require('./telephony/providers.cjs');
 const { normalizeEvent, statusCanAdvance } = require('./telephony/events.cjs');
 function phoneWebhook(providerName, secrets) {
@@ -956,6 +1003,10 @@ function phoneWebhook(providerName, secrets) {
     if(!valid) return response.status(403).send('Invalid signature');
     const event=normalizeEvent(providerName,request.body || {},rawBody);
     if(!event.callId) return response.status(400).send('Missing call identifier');
+    if (event.dispatchId) {
+      try { if (await operations.dispatchEvent(event)) return response.status(200).send('Accepted'); }
+      catch (error) { if (error.code === 'permission-denied') return response.status(403).send('Invalid inbound leg'); throw error; }
+    }
     const snapshots=await db.collectionGroup('callRecords').where('provider','==',providerName).where('providerCallId','==',event.callId).limit(2).get();
     let matches=snapshots.docs, consultation=false;
     if(!matches.length && providerName==='telnyx' && event.gmsCallId && event.tenantId && !event.gmsCallId.includes('/') && !event.tenantId.includes('/')) {
@@ -963,6 +1014,10 @@ function phoneWebhook(providerName, secrets) {
       if(candidate.exists && candidate.data().provider==='telnyx' && !candidate.data().providerCallId &&
         candidate.data().tenantId===event.tenantId && event.connectionId===process.env.TELNYX_CONNECTION_ID &&
         normalizedPhone(event.from)===normalizedPhone(candidate.data().from) && normalizedPhone(event.to)===normalizedPhone(candidate.data().destination)) matches=[candidate];
+    }
+    if (!matches.length && providerName === 'telnyx' && event.direction === 'incoming' && event.eventType === 'call.initiated') {
+      try { const incoming = await operations.inboundEvent(event); matches = [await incoming.ref.get()]; }
+      catch (error) { if (error.code === 'permission-denied') return response.status(202).send('No authorized inbound line'); throw error; }
     }
     if(!matches.length) { const other=await db.collectionGroup('callRecords').where('provider','==',providerName).where('consultationCallId','==',event.callId).limit(2).get(); matches=other.docs; consultation=true; }
     if(matches.length!==1) return response.status(202).send('No uniquely mapped call');
@@ -986,6 +1041,7 @@ function phoneWebhook(providerName, secrets) {
       tx.create(eventRef,{provider:providerName,eventType:event.eventType || 'unknown',receivedAt:FieldValue.serverTimestamp()});
       tx.update(ref,patch);
     });
+    if (providerName === 'telnyx' && event.eventType === 'call.initiated' && matches[0].data().direction === 'inbound') await operations.dispatchInbound(ref);
     // Only a signed answered event can trigger recording. Browser state and
     // browser-supplied provider identifiers cannot initiate this operation.
     if(providerName==='telnyx' && event.answered && !consultation && process.env.TELEPHONY_ENABLED==='true') {

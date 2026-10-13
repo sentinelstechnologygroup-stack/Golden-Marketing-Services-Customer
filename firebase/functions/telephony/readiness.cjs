@@ -2,7 +2,8 @@
 
 function configurationIssues(env) {
   const issues = [];
-  if (env.TELEPHONY_PROVIDER === 'telnyx') {
+  if (env.TELEPHONY_PROVIDER && env.TELEPHONY_PROVIDER !== 'telnyx') issues.push('TELEPHONY_PROVIDER');
+  if (!env.TELEPHONY_PROVIDER || env.TELEPHONY_PROVIDER === 'telnyx') {
     for (const key of ['TELNYX_CONNECTION_ID', 'TELNYX_PUBLIC_KEY', 'TELNYX_STATUS_WEBHOOK_URL', 'TELEPHONY_STATUS_URL']) {
       if (!env[key] || env[key] === 'not-configured') issues.push(key);
     }
