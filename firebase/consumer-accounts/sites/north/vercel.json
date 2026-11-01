@@ -1,0 +1,96 @@
+{
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "Content-Security-Policy",
+          "value": "default-src 'self'; script-src 'self' https://www.googletagmanager.com https://connect.facebook.net 'sha256-Iz9U6boJ8FLVUvBEs/HM+CXuul+rropSFtLcnf++X4o='; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https://cdn.repliers.io https://tile.openstreetmap.org https://www.google-analytics.com https://www.googleadservices.com https://googleads.g.doubleclick.net https://www.facebook.com; media-src 'self'; connect-src 'self' https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://firestore.googleapis.com https://www.google-analytics.com https://region1.google-analytics.com https://analytics.google.com https://www.googletagmanager.com https://www.googleadservices.com https://googleads.g.doubleclick.net https://www.facebook.com; frame-src https://www.har.com https://har.com https://gcr-visitor-preview-2026.firebaseapp.com; object-src 'none'; base-uri 'self'; form-action 'self' mailto:; frame-ancestors 'none'; upgrade-insecure-requests"
+        },
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
+        {
+          "key": "X-Frame-Options",
+          "value": "DENY"
+        },
+        {
+          "key": "Referrer-Policy",
+          "value": "strict-origin-when-cross-origin"
+        },
+        {
+          "key": "Permissions-Policy",
+          "value": "camera=(), microphone=(), geolocation=(), payment=()"
+        },
+        {
+          "key": "Cross-Origin-Opener-Policy",
+          "value": "same-origin-allow-popups"
+        },
+        {
+          "key": "Strict-Transport-Security",
+          "value": "max-age=31536000; includeSubDomains"
+        }
+      ]
+    },
+    {
+      "source": "/account",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "private, no-store"
+        },
+        {
+          "key": "Referrer-Policy",
+          "value": "no-referrer"
+        },
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
+        }
+      ]
+    }
+  ],
+  "rewrites": [
+    {
+      "source": "/account",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/verify",
+      "destination": "/verify/index.html"
+    },
+    {
+      "source": "/buy",
+      "destination": "/buy/index.html"
+    },
+    {
+      "source": "/sell",
+      "destination": "/sell/index.html"
+    },
+    {
+      "source": "/investment-properties",
+      "destination": "/investment-properties/index.html"
+    },
+    {
+      "source": "/homes",
+      "destination": "/homes/index.html"
+    },
+    {
+      "source": "/market-reports",
+      "destination": "/market-reports/index.html"
+    },
+    {
+      "source": "/privacy",
+      "destination": "/privacy/index.html"
+    },
+    {
+      "source": "/terms",
+      "destination": "/terms/index.html"
+    },
+    {
+      "destination": "/index.html",
+      "source": "/property/:boardId/:mlsNumber"
+    }
+  ]
+}

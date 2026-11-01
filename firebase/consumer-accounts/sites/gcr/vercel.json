@@ -1,0 +1,428 @@
+{
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "value": "default-src 'self'; script-src 'self' 'unsafe-inline' https://www.googletagmanager.com https://connect.facebook.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https: https://www.google-analytics.com https://www.googleadservices.com https://googleads.g.doubleclick.net https://www.facebook.com; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' https://*.googleapis.com https://www.google-analytics.com https://region1.google-analytics.com https://analytics.google.com https://www.googletagmanager.com https://www.googleadservices.com https://googleads.g.doubleclick.net https://www.facebook.com; frame-src https://www.har.com https://har.com https://www.youtube.com https://www.youtube-nocookie.com https://gcr-visitor-preview-2026.firebaseapp.com; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'; upgrade-insecure-requests",
+          "key": "Content-Security-Policy"
+        },
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
+        {
+          "key": "X-Frame-Options",
+          "value": "SAMEORIGIN"
+        },
+        {
+          "key": "Cross-Origin-Opener-Policy",
+          "value": "same-origin-allow-popups"
+        },
+        {
+          "key": "Referrer-Policy",
+          "value": "strict-origin-when-cross-origin"
+        },
+        {
+          "key": "Permissions-Policy",
+          "value": "camera=(), microphone=(), geolocation=()"
+        },
+        {
+          "key": "Strict-Transport-Security",
+          "value": "max-age=31536000; includeSubDomains"
+        }
+      ]
+    },
+    {
+      "source": "/images/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
+        }
+      ]
+    },
+    {
+      "source": "/video/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
+        }
+      ]
+    },
+    {
+      "source": "/media/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
+        }
+      ]
+    },
+    {
+      "source": "/fonts/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=86400"
+        }
+      ]
+    },
+    {
+      "source": "/account",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "private, no-store"
+        },
+        {
+          "key": "Referrer-Policy",
+          "value": "no-referrer"
+        },
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
+        }
+      ]
+    }
+  ],
+  "redirects": [
+    {
+      "source": "/privacy-policy",
+      "destination": "/privacy",
+      "permanent": true
+    },
+    {
+      "source": "/privacy-policy/",
+      "destination": "/privacy",
+      "permanent": true
+    },
+    {
+      "source": "/buyers",
+      "destination": "/buy",
+      "permanent": true
+    },
+    {
+      "source": "/buyers/",
+      "destination": "/buy",
+      "permanent": true
+    },
+    {
+      "source": "/sellers",
+      "destination": "/sell",
+      "permanent": true
+    },
+    {
+      "source": "/sellers/",
+      "destination": "/sell",
+      "permanent": true
+    },
+    {
+      "source": "/listings",
+      "destination": "/properties",
+      "permanent": true
+    },
+    {
+      "source": "/listings/",
+      "destination": "/properties",
+      "permanent": true
+    },
+    {
+      "source": "/about-us",
+      "destination": "/about",
+      "permanent": true
+    },
+    {
+      "source": "/about-us/",
+      "destination": "/about",
+      "permanent": true
+    },
+    {
+      "source": "/contact-us",
+      "destination": "/contact",
+      "permanent": true
+    },
+    {
+      "source": "/contact-us/",
+      "destination": "/contact",
+      "permanent": true
+    },
+    {
+      "source": "/faqs",
+      "destination": "/faq",
+      "permanent": true
+    },
+    {
+      "source": "/faqs/",
+      "destination": "/faq",
+      "permanent": true
+    },
+    {
+      "source": "/homes-for-sale-conroe-tx",
+      "destination": "/blog/homes-for-sale-conroe-tx",
+      "permanent": true
+    },
+    {
+      "source": "/homes-for-sale-conroe-tx/",
+      "destination": "/blog/homes-for-sale-conroe-tx",
+      "permanent": true
+    },
+    {
+      "source": "/how-to-sell-your-home-fast-in-east-texas",
+      "destination": "/blog/how-to-sell-your-home-fast-in-east-texas",
+      "permanent": true
+    },
+    {
+      "source": "/how-to-sell-your-home-fast-in-east-texas/",
+      "destination": "/blog/how-to-sell-your-home-fast-in-east-texas",
+      "permanent": true
+    },
+    {
+      "source": "/east-texas-real-estate-relocation-2026",
+      "destination": "/blog/east-texas-real-estate-relocation-2026",
+      "permanent": true
+    },
+    {
+      "source": "/east-texas-real-estate-relocation-2026/",
+      "destination": "/blog/east-texas-real-estate-relocation-2026",
+      "permanent": true
+    },
+    {
+      "source": "/first-time-homebuyers-east-texas-guide",
+      "destination": "/blog/first-time-homebuyers-east-texas-guide",
+      "permanent": true
+    },
+    {
+      "source": "/first-time-homebuyers-east-texas-guide/",
+      "destination": "/blog/first-time-homebuyers-east-texas-guide",
+      "permanent": true
+    },
+    {
+      "source": "/real-estate-in-east-texas-conroe-willis-montgomery",
+      "destination": "/blog/real-estate-in-east-texas-conroe-willis-montgomery",
+      "permanent": true
+    },
+    {
+      "source": "/real-estate-in-east-texas-conroe-willis-montgomery/",
+      "destination": "/blog/real-estate-in-east-texas-conroe-willis-montgomery",
+      "permanent": true
+    },
+    {
+      "source": "/cheap-homes-for-sale-in-east-texas",
+      "destination": "/blog/cheap-homes-for-sale-in-east-texas",
+      "permanent": true
+    },
+    {
+      "source": "/cheap-homes-for-sale-in-east-texas/",
+      "destination": "/blog/cheap-homes-for-sale-in-east-texas",
+      "permanent": true
+    },
+    {
+      "source": "/why-investing-in-real-estate-in-east-texas",
+      "destination": "/blog/why-investing-in-real-estate-in-east-texas",
+      "permanent": true
+    },
+    {
+      "source": "/why-investing-in-real-estate-in-east-texas/",
+      "destination": "/blog/why-investing-in-real-estate-in-east-texas",
+      "permanent": true
+    },
+    {
+      "source": "/best-areas-for-real-estate-in-east-texas",
+      "destination": "/blog/best-areas-for-real-estate-in-east-texas",
+      "permanent": true
+    },
+    {
+      "source": "/best-areas-for-real-estate-in-east-texas/",
+      "destination": "/blog/best-areas-for-real-estate-in-east-texas",
+      "permanent": true
+    },
+    {
+      "source": "/real-estate-in-east-texas",
+      "destination": "/blog/real-estate-in-east-texas",
+      "permanent": true
+    },
+    {
+      "source": "/real-estate-in-east-texas/",
+      "destination": "/blog/real-estate-in-east-texas",
+      "permanent": true
+    },
+    {
+      "source": "/houses-for-sale-in-texas",
+      "destination": "/blog/houses-for-sale-in-texas",
+      "permanent": true
+    },
+    {
+      "source": "/houses-for-sale-in-texas/",
+      "destination": "/blog/houses-for-sale-in-texas",
+      "permanent": true
+    },
+    {
+      "source": "/land-for-sale-in-texas",
+      "destination": "/blog/land-for-sale-in-texas",
+      "permanent": true
+    },
+    {
+      "source": "/land-for-sale-in-texas/",
+      "destination": "/blog/land-for-sale-in-texas",
+      "permanent": true
+    },
+    {
+      "source": "/real-estate-east-texas-2026",
+      "destination": "/blog/real-estate-east-texas-2026",
+      "permanent": true
+    },
+    {
+      "source": "/real-estate-east-texas-2026/",
+      "destination": "/blog/real-estate-east-texas-2026",
+      "permanent": true
+    },
+    {
+      "source": "/homes-for-sale-in-san-antonio",
+      "destination": "/blog/homes-for-sale-in-san-antonio",
+      "permanent": true
+    },
+    {
+      "source": "/homes-for-sale-in-san-antonio/",
+      "destination": "/blog/homes-for-sale-in-san-antonio",
+      "permanent": true
+    },
+    {
+      "source": "/texas-real-estate-in-2026",
+      "destination": "/blog/texas-real-estate-in-2026",
+      "permanent": true
+    },
+    {
+      "source": "/texas-real-estate-in-2026/",
+      "destination": "/blog/texas-real-estate-in-2026",
+      "permanent": true
+    },
+    {
+      "source": "/closing-costs-for-sellers-in-texas-2026",
+      "destination": "/blog/closing-costs-for-sellers-in-texas-2026",
+      "permanent": true
+    },
+    {
+      "source": "/closing-costs-for-sellers-in-texas-2026/",
+      "destination": "/blog/closing-costs-for-sellers-in-texas-2026",
+      "permanent": true
+    },
+    {
+      "source": "/best-realtor-to-sell-lakefront-property-montgomery-tx",
+      "destination": "/blog/best-realtor-to-sell-lakefront-property-montgomery-tx",
+      "permanent": true
+    },
+    {
+      "source": "/best-realtor-to-sell-lakefront-property-montgomery-tx/",
+      "destination": "/blog/best-realtor-to-sell-lakefront-property-montgomery-tx",
+      "permanent": true
+    },
+    {
+      "source": "/what-is-a-free-comparative-market",
+      "destination": "/blog/what-is-a-free-comparative-market",
+      "permanent": true
+    },
+    {
+      "source": "/what-is-a-free-comparative-market/",
+      "destination": "/blog/what-is-a-free-comparative-market",
+      "permanent": true
+    },
+    {
+      "source": "/conroe-tx-home-prices-2026-is-it-a-buyers-or-sellers-market",
+      "destination": "/blog/conroe-tx-home-prices-2026-is-it-a-buyers-or-sellers-market",
+      "permanent": true
+    },
+    {
+      "source": "/conroe-tx-home-prices-2026-is-it-a-buyers-or-sellers-market/",
+      "destination": "/blog/conroe-tx-home-prices-2026-is-it-a-buyers-or-sellers-market",
+      "permanent": true
+    },
+    {
+      "source": "/top-rated-real-estate-brokerage-in-conroe-tx-for-residential-properties",
+      "destination": "/blog/top-rated-real-estate-brokerage-in-conroe-tx-for-residential-properties",
+      "permanent": true
+    },
+    {
+      "source": "/top-rated-real-estate-brokerage-in-conroe-tx-for-residential-properties/",
+      "destination": "/blog/top-rated-real-estate-brokerage-in-conroe-tx-for-residential-properties",
+      "permanent": true
+    },
+    {
+      "source": "/steps-to-hire-a-professional-realtor-in-conroe-tx-for-selling-a-house",
+      "destination": "/blog/steps-to-hire-a-professional-realtor-in-conroe-tx-for-selling-a-house",
+      "permanent": true
+    },
+    {
+      "source": "/steps-to-hire-a-professional-realtor-in-conroe-tx-for-selling-a-house/",
+      "destination": "/blog/steps-to-hire-a-professional-realtor-in-conroe-tx-for-selling-a-house",
+      "permanent": true
+    },
+    {
+      "source": "/conroe-tx-real-estate-agents-specializing-in-first-time-homebuyers",
+      "destination": "/blog/conroe-tx-real-estate-agents-specializing-in-first-time-homebuyers",
+      "permanent": true
+    },
+    {
+      "source": "/conroe-tx-real-estate-agents-specializing-in-first-time-homebuyers/",
+      "destination": "/blog/conroe-tx-real-estate-agents-specializing-in-first-time-homebuyers",
+      "permanent": true
+    },
+    {
+      "source": "/the-ultimate-neighborhood-guide-best-places-to-live-in-conroe-tx",
+      "destination": "/blog/the-ultimate-neighborhood-guide-best-places-to-live-in-conroe-tx",
+      "permanent": true
+    },
+    {
+      "source": "/the-ultimate-neighborhood-guide-best-places-to-live-in-conroe-tx/",
+      "destination": "/blog/the-ultimate-neighborhood-guide-best-places-to-live-in-conroe-tx",
+      "permanent": true
+    },
+    {
+      "source": "/avoid-these-top-mistakes-when-buying-your-first-home-in-conroe-texas",
+      "destination": "/blog/avoid-these-top-mistakes-when-buying-your-first-home-in-conroe-texas",
+      "permanent": true
+    },
+    {
+      "source": "/avoid-these-top-mistakes-when-buying-your-first-home-in-conroe-texas/",
+      "destination": "/blog/avoid-these-top-mistakes-when-buying-your-first-home-in-conroe-texas",
+      "permanent": true
+    },
+    {
+      "source": "/what-to-know-before-buying-a-home-in-conroe-tx",
+      "destination": "/blog/what-to-know-before-buying-a-home-in-conroe-tx",
+      "permanent": true
+    },
+    {
+      "source": "/what-to-know-before-buying-a-home-in-conroe-tx/",
+      "destination": "/blog/what-to-know-before-buying-a-home-in-conroe-tx",
+      "permanent": true
+    },
+    {
+      "source": "/featured-properties/2119-tree-lane-humble-tx-77339",
+      "destination": "/featured-properties/2119-tree-ln-hockley",
+      "permanent": true
+    },
+    {
+      "source": "/off-market-properties",
+      "destination": "/featured-properties?status=off-market",
+      "permanent": true
+    },
+    {
+      "source": "/off-market-properties/:slug",
+      "destination": "/featured-properties/:slug",
+      "permanent": true
+    }
+  ],
+  "rewrites": [
+    {
+      "source": "/account",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/property/:boardId/:mlsNumber",
+      "destination": "/index.html"
+    }
+  ],
+  "cleanUrls": true
+}

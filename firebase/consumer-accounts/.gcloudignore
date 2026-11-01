@@ -1,0 +1,9 @@
+node_modules/
+tests/
+*.log
+*.local*
+README.md
+
+preview/
+scripts/
+sites/
