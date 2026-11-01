@@ -16,6 +16,11 @@
     "src/components/layout/SiteHeader.jsx",
     "src/components/seo/SEO.jsx",
     "src/lib/submitLead.js",
-    "src/components/conversion/BrokerageInquiryForm.jsx"
-  ]
+    "src/components/conversion/BrokerageInquiryForm.jsx",
+    "src/components/conversion/ConsumerAuth.jsx",
+    "src/components/conversion/ConsumerHub.jsx",
+    "src/components/conversion/consumer-hub.css",
+    "src/components/conversion/PropertySearch.jsx"
+  ],
+  "accountHubRelease": "2026-11-01"
 }

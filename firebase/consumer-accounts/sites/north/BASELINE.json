@@ -16,6 +16,11 @@
     "src/components/landing/LeadFormSection.jsx",
     "src/lib/funnelSession.js",
     "src/lib/seo.js",
-    "scripts/check-contact-intake.mjs"
-  ]
+    "scripts/check-contact-intake.mjs",
+    "src/components/conversion/ConsumerAuth.jsx",
+    "src/components/conversion/ConsumerHub.jsx",
+    "src/components/conversion/consumer-hub.css",
+    "src/components/conversion/PropertySearch.jsx"
+  ],
+  "accountHubRelease": "2026-11-01"
 }
