@@ -1,6 +1,6 @@
 import {accountLink,clearAccountLink} from './accountLink';
 import { initializeApp, getApps } from 'firebase/app';
-import { getAuth, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail, sendEmailVerification, sendSignInLinkToEmail, verifyBeforeUpdateEmail, isSignInWithEmailLink, signInWithEmailLink, signOut } from 'firebase/auth';
+import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail, sendEmailVerification, sendSignInLinkToEmail, verifyBeforeUpdateEmail, isSignInWithEmailLink, signInWithEmailLink, signOut } from 'firebase/auth';
 const projectId=import.meta.env.VITE_VISITOR_PROJECT_ID;
 export const accountsEnabled=projectId==='gcr-visitor-preview-2026'&&Boolean(import.meta.env.VITE_VISITOR_API_KEY&&import.meta.env.VITE_VISITOR_APP_ID);
 let auth,cache=null,loading=null,mutationQueue=Promise.resolve();const listeners=new Set();
@@ -23,12 +23,13 @@ export async function sendAccountLink(email){await sendSignInLinkToEmail(service
 export function hasAccountLink(){return accountsEnabled&&isSignInWithEmailLink(service(),accountLink());}
 export function rememberedEmail(){try{return localStorage.getItem('gcr-account-email')||'';}catch{return '';}}
 export async function completeAccountLink(email){const result=await signInWithEmailLink(service(),email,accountLink());localStorage.removeItem('gcr-account-email');clearAccountLink();window.history.replaceState({},'',window.location.pathname);return result.user;}
+export async function enterGoogleAccount(){const provider=new GoogleAuthProvider();provider.setCustomParameters({prompt:'select_account'});return (await signInWithPopup(service(),provider)).user;}
 export async function enterAccount(email,password){return (await signInWithEmailAndPassword(service(),email,password)).user;}
 export async function verifyAccount(){if(service().currentUser)await sendEmailVerification(service().currentUser);}
 export async function refreshAccount(){const user=service().currentUser;if(user){await user.reload();await user.getIdToken(true);}return user;}
 export function resetAccount(email){return sendPasswordResetEmail(service(),email);}
 export function leaveAccount(){cache=null;return signOut(service());}
-export function accountError(error){if(['auth/weak-password','auth/password-does-not-meet-requirements'].includes(error?.code))return 'Use a password between 12 and 128 characters.';if(error?.code==='auth/too-many-requests')return 'Please wait before trying again.';if(error?.code==='auth/expired-action-code'||error?.code==='auth/invalid-action-code')return 'This sign-in link has expired or was already used. Request a new link.';if(error?.code?.startsWith('auth/'))return 'We could not sign you in. Check your email or request a fresh sign-in link.';return error?.message||'Your account could not be saved. Please try again.';}
+export function accountError(error){if(error?.code==='auth/popup-closed-by-user')return 'Google sign-in was canceled. You can try again or use your email and password.';if(error?.code==='auth/popup-blocked')return 'Allow the Google sign-in popup, or use your email and password.';if(error?.code==='auth/account-exists-with-different-credential')return 'Sign in using your existing account method. We have not changed your account.';if(['auth/weak-password','auth/password-does-not-meet-requirements'].includes(error?.code))return 'Use a password between 12 and 128 characters.';if(error?.code==='auth/too-many-requests')return 'Please wait before trying again.';if(error?.code==='auth/expired-action-code'||error?.code==='auth/invalid-action-code')return 'This sign-in link has expired or was already used. Request a new link.';if(error?.code?.startsWith('auth/'))return 'We could not sign you in. Check your email or request a fresh sign-in link.';return error?.message||'Your account could not be saved. Please try again.';}
 
 export async function syncInquiry(reference,email){if(!accountsEnabled||!service().currentUser?.emailVerified||email&&service().currentUser.email.toLowerCase()!==String(email).toLowerCase()||!/^([a-f0-9]{64})$/.test(reference||''))return;try{localStorage.setItem(pendingKey(),JSON.stringify([...new Set([...pendingInquiries(),reference])].slice(-20)));}catch{/* Durable intake itself is already saved by the server. */}await drainInquiries();return cache;}
 
