@@ -37,3 +37,5 @@ export function changeAccountEmail(email){if(!service().currentUser)throw Error(
 
 export async function createPasswordAccount(email,password){const result=await createUserWithEmailAndPassword(service(),email,password);await sendEmailVerification(result.user,{url:window.location.origin+'/account'});return result.user;}
 export async function recordViewed(listingId){if(!accountsEnabled||!service().currentUser?.emailVerified)return;if(!cache)await loadAccount();if(cache?.recentlyViewed?.[0]===listingId)return;return saveAccount('recently_viewed',{listingId});}
+
+export function archiveInquiry(inquiryId,archived){return saveAccount('archive_inquiry',{inquiryId,archived});}

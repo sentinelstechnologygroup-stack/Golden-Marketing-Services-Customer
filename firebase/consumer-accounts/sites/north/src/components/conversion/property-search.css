@@ -27,3 +27,5 @@
 
 /* Consumer account controls */
 .ps-account-dialog label{display:flex;flex-direction:column;gap:6px;margin:14px 0}.ps-account-dialog input:not([type=checkbox]),.ps-account-dialog select{width:100%;padding:10px;border:1px solid #c7ced5;border-radius:6px;background:#fff;color:#14283b}.ps-account-dialog .ps-check{display:flex;flex-direction:row;align-items:flex-start;line-height:1.6}.ps-account-dialog .ps-check input{margin-top:6px;flex:none}.ps-account-search{border:1px solid #d8ddd9;border-radius:10px;padding:18px;margin:20px 0}.ps-account-dialog{max-height:85vh;overflow:auto}.property-search>.ps-panel>.ps-account-dialog{max-height:none;max-width:none;width:100%;box-shadow:none}.ps-account-dialog button{min-height:42px}.ps-account-dialog form>.ps-tools{margin:18px 0}
+
+.ps-card-media{position:relative}.ps-card-heart{position:absolute;right:12px;top:12px;z-index:3;width:44px;height:44px;border-radius:50%;display:grid;place-items:center;background:#fff;color:#172d3a;border:1px solid #d5dce0;box-shadow:0 2px 8px #0002;cursor:pointer}.ps-card-heart[aria-pressed="true"]{color:#a32747}.ps-card-heart:focus-visible{outline:3px solid #b89548;outline-offset:3px}
