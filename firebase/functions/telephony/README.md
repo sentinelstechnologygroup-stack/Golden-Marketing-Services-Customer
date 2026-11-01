@@ -33,3 +33,7 @@ these same second-generation functions. Keep calling disabled during deployment.
 Inbound dispatch, voicemail, SMS delivery/opt-out callbacks, token refresh,
 transcription and conference handoff still require separate implementation and
 validation. Do not infer readiness from successful builds or an API key.
+
+An internal-test-only SMS draft is now available in `../messaging/README.md`.
+It has separate default-off controls and has not passed live acceptance.
+The existing voice flags and unmerged multi-client work are unchanged.

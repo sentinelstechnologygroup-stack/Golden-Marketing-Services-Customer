@@ -79,14 +79,16 @@ service cloud.firestore {
           && collection != 'auditLogs'
           && (!agentAssigned(tenantId) || gmsSuperAdmin() || membership(tenantId) || agentBrandAllowed(tenantId))
           && (gmsSuperAdmin() || agentAssigned(tenantId) || (membership(tenantId) && (role(tenantId) in ['admin', 'supervisor', 'client_admin', 'client_supervisor', 'auditor'] || (role(tenantId) in ['customer', 'client'] && customerReadable(collection)))));
-        allow create: if membership(tenantId)
+        allow create: if !request.resource.data.keys().hasAny(['smsMessages', 'smsVerification'])
+          && membership(tenantId)
           && collection != 'members'
           && collection != 'auditLogs'
           && tenantData(tenantId)
           && ((role(tenantId) in ['admin', 'supervisor', 'client_admin', 'client_supervisor'] && operationalCollection(collection))
             || (role(tenantId) in ['admin', 'supervisor', 'client_admin', 'client_supervisor'] && configurationCollection(collection))
             || (role(tenantId) in ['admin', 'client_admin'] && collection in ['support', 'documents']));
-        allow update: if membership(tenantId)
+        allow update: if !request.resource.data.diff(resource.data).affectedKeys().hasAny(['smsMessages', 'smsVerification'])
+          && membership(tenantId)
           && (!('managedBy' in resource.data) || resource.data.managedBy != 'onboarding')
           && collection != 'members'
           && collection != 'auditLogs'

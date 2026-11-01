@@ -77,6 +77,7 @@ const REQUIRED_FIELDS = {
 };
 
 const IMMUTABLE_TENANT_FIELDS = new Set([
+  'smsMessages', 'smsVerification',
   'tenantId', 'organization_id', 'industry', 'industryId', 'brandId', 'brand_id',
   'sourceId', 'source_id', 'campaignId', 'campaign_id', 'routingProfileId',
   'workflowVersion', 'scriptSetId', 'qualificationFormId', 'consentPolicyId',
@@ -166,7 +167,9 @@ function applyAssignmentBrand(assignment, collectionName, value) {
 
 function stripImmutablePatch(data) {
   const patch = objectInput(data);
-  for (const field of IMMUTABLE_TENANT_FIELDS) delete patch[field];
+  for (const field of Object.keys(patch)) {
+    if (IMMUTABLE_TENANT_FIELDS.has(field) || /^(smsMessages|smsVerification)\./.test(field)) delete patch[field];
+  }
   return patch;
 }
 
@@ -608,7 +611,9 @@ exports.createAgentRecord = onCall({ enforceAppCheck: true }, async (request) =>
   const roles = writeRolesFor(collectionName);
   if (!roles.length) throw new HttpsError('permission-denied', 'This collection is not writable through the CRM API.');
   const authorization = await requireAgentAssignment(request, tenantId, roles);
-  const input = applyAssignmentBrand(authorization.assignment, collectionName, data);
+  const input = applyAssignmentBrand(authorization.assignment, collectionName, { ...data });
+  delete input.smsMessages;
+  delete input.smsVerification;
   validateRequiredFields(collectionName, input);
   if (collectionName === 'leads' && INDUSTRY_POLICY_FIELDS.some((field) => input[field] === undefined && field !== 'receivedAt')) throw new HttpsError('invalid-argument', 'Lead workflow metadata is required.');
   return createTenantRecord({ request, tenantId, collectionName, roles, authorize: requireAgentAssignment, authorization, action: `crm.${collectionName}.created`, data: input });

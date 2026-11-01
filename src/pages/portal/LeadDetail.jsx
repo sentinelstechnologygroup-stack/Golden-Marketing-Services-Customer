@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { ArrowLeft, Phone, Mail, MapPin, Clock, User, FileText, CheckCircle2, XCircle, CalendarClock, Headset, ShieldCheck, ReceiptText, Activity } from "lucide-react";
+import LeadSmsActivity from "@/components/LeadSmsActivity";
 import portalAdapter from "@/services/portalAdapter";
 import { usePortalData } from "@/lib/usePortalData";
 import Badge, { stageTone } from "@/components/portal/Badge";
@@ -72,6 +73,8 @@ export default function LeadDetail() {
               <InfoRow icon={Clock} label="First response" value={lead.firstResponseMinutes != null ? `${lead.firstResponseMinutes} min` : "Awaiting contact"} />
             </div>
           </SectionCard>
+
+          <LeadSmsActivity lead={lead} />
 
           {/* Timeline */}
           <SectionCard title="Conversation timeline" subtitle={`${lead.outreachAttempts} outreach attempt${lead.outreachAttempts !== 1 ? "s" : ""}`}>
