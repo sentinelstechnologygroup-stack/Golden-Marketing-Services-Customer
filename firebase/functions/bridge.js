@@ -157,7 +157,12 @@ exports.ingestWebsiteLead = onRequest({ cors: false, secrets: [ingestionKey], ti
   }
   if (!lead.email && !lead.phone) return response.status(400).json({ error: 'Email or phone is required' });
   const now = FieldValue.serverTimestamp();
-  await leadRef.set({ ...lead, receivedAt: now, createdAt: now, updatedAt: now, createdBy: 'server:website-ingestion' });
+  const batch = db.batch();
+  batch.set(leadRef, { ...lead, receivedAt: now, createdAt: now, updatedAt: now, createdBy: 'server:website-ingestion' });
+  const smsPolicy = require('./messaging/policy.cjs');
+  const smsConsent = smsPolicy.captureConsent(route, request.body || {});
+  if (smsConsent) batch.set(db.doc(`smsIntakes/${smsPolicy.key(route.tenantId, leadRef.id)}`), { ...smsConsent, leadId: leadRef.id });
+  await batch.commit();
   await writeAudit(route.tenantId, 'server:website-ingestion', 'lead.ingested', leadRef.id, { brandId: route.brandId, routeKey, assignedTo });
   await notifyTenant({ tenantId: route.tenantId, brandId: route.brandId, assignedTo, clientContactUid: clientContact?.uid || clientContact?.memberUid, type: 'lead_received', title: 'New lead received', body: `${lead.name} entered the ${brand.data().name || 'client'} queue.`, relatedId: leadRef.id });
   return response.status(202).json({ accepted: true, leadId: leadRef.id, receivedAt: new Date().toISOString() });

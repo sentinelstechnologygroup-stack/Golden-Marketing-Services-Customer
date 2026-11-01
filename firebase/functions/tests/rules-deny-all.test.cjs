@@ -255,3 +255,22 @@ test('creative file paths are immutable: replacement requires a new document/ver
   });
   await assertFails(uploadBytes(file,new Uint8Array([2]),{contentType:'text/plain'}));
 });
+
+test('SMS credentials, consent, bindings and suppression are server-only; lead receipts cannot be forged', async () => {
+  await env.withSecurityRulesDisabled(async context => {
+    const db = context.firestore();
+    await setDoc(doc(db, 'tenants/sms-tenant/members/sms-admin'), {tenantId:'sms-tenant', role:'client_admin', active:true});
+    await setDoc(doc(db, 'tenants/sms-tenant/leads/sms-lead'), {tenantId:'sms-tenant', brandId:'gcr', smsVerification:{status:'pending'}, smsMessages:[]});
+  });
+  const db = env.authenticatedContext('sms-admin').firestore();
+  await assertSucceeds(getDoc(doc(db, 'tenants/sms-tenant/leads/sms-lead')));
+  await assertFails(setDoc(doc(db, 'tenants/sms-tenant/leads/sms-lead'), {smsVerification:{status:'verified'}}, {merge:true}));
+  await assertFails(setDoc(doc(db, 'tenants/sms-tenant/leads/forged'), {tenantId:'sms-tenant', smsMessages:[]}));
+  for (const collection of ['smsRoutes','smsNumberRoutes','smsIntakes','smsBindings','smsSuppressions','smsOutbound','smsProviderMessages','smsEvents']) {
+    await assertFails(getDoc(doc(db, `${collection}/test`)));
+    await assertFails(setDoc(doc(db, `${collection}/test`), {enabled:true}));
+    const superDb = env.authenticatedContext('sms-super', {gmsSuperAdmin:true}).firestore();
+    await assertFails(getDoc(doc(superDb, `${collection}/test`)));
+  }
+  await assertFails(getDoc(doc(env.authenticatedContext('outsider').firestore(), 'tenants/sms-tenant/leads/sms-lead')));
+});
