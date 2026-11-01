@@ -1,0 +1,8 @@
+import {useEffect,useState} from 'react';
+import {useLocation} from 'react-router-dom';
+import {initializeTracking,readConsent,saveConsent,trackPage} from '../lib/campaignTracking';
+import './campaign-consent.css';
+export default function CampaignConsent(){const location=useLocation();const [open,setOpen]=useState(()=>!readConsent());const [choice,setChoice]=useState(()=>readConsent()||{analytics:false,ads:false});const gpc=typeof navigator!=='undefined'&&/** @type {any} */(navigator).globalPrivacyControl===true;
+useEffect(()=>{initializeTracking();const openSettings=()=>setOpen(true);window.addEventListener('gms-cookie-settings',openSettings);return()=>window.removeEventListener('gms-cookie-settings',openSettings);},[]);useEffect(()=>{trackPage();},[location.pathname]);
+const save=c=>{saveConsent(c);setChoice(c);setOpen(false);trackPage();};
+return <>{open&&<section className="privacy-panel" aria-label="Privacy choices"><strong>Your privacy choices</strong><p>Home searches work without optional tracking. You can allow site analytics and advertising measurement separately. We do not use personalized housing advertising.</p><label><input type="checkbox" checked={choice.analytics} onChange={e=>setChoice({...choice,analytics:e.target.checked})}/> Site analytics</label><label><input type="checkbox" disabled={gpc} checked={choice.ads&&!gpc} onChange={e=>setChoice({...choice,ads:e.target.checked})}/> Advertising measurement</label>{gpc&&<p>Your browser’s Global Privacy Control keeps advertising measurement off.</p>}<div><button onClick={()=>save({analytics:false,ads:false})}>Reject optional</button><button onClick={()=>save(choice)}>Save choices</button></div><a href="/privacy">Privacy policy</a></section>}</>}
