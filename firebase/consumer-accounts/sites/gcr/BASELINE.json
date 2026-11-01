@@ -1,0 +1,26 @@
+{
+  "site": "gcr",
+  "baselineDeployment": "dpl_5eCwSXnhNjMYLxVcFzswRuq69EeF",
+  "gitCommit": "a92fcab3241dd2c7f9cc42cac1799aec1316262e",
+  "files": [
+    "api/visitor.js",
+    "src/App.jsx",
+    "src/main.jsx",
+    "src/pages/Account.jsx",
+    "src/lib/visitorAccount.js",
+    "src/lib/accountLink.js",
+    "src/components/conversion/VisitorAccount.jsx",
+    "src/components/conversion/property-search.css",
+    "src/components/conversion/SearchMatchBanner.jsx",
+    "vercel.json",
+    "src/components/layout/SiteHeader.jsx",
+    "src/components/seo/SEO.jsx",
+    "src/lib/submitLead.js",
+    "src/components/conversion/BrokerageInquiryForm.jsx",
+    "src/components/conversion/ConsumerAuth.jsx",
+    "src/components/conversion/ConsumerHub.jsx",
+    "src/components/conversion/consumer-hub.css",
+    "src/components/conversion/PropertySearch.jsx"
+  ],
+  "accountHubRelease": "2026-11-01"
+}

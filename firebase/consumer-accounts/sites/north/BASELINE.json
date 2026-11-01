@@ -1,0 +1,26 @@
+{
+  "site": "north",
+  "baselineDeployment": "dpl_9YX89zK1S2i42zf52QU4dsYytJcS",
+  "files": [
+    "api/visitor.js",
+    "src/App.jsx",
+    "src/main.jsx",
+    "src/pages/Account.jsx",
+    "src/lib/visitorAccount.js",
+    "src/lib/accountLink.js",
+    "src/components/conversion/VisitorAccount.jsx",
+    "src/components/conversion/property-search.css",
+    "src/components/conversion/SearchMatchBanner.jsx",
+    "vercel.json",
+    "src/components/landing/Navbar.jsx",
+    "src/components/landing/LeadFormSection.jsx",
+    "src/lib/funnelSession.js",
+    "src/lib/seo.js",
+    "scripts/check-contact-intake.mjs",
+    "src/components/conversion/ConsumerAuth.jsx",
+    "src/components/conversion/ConsumerHub.jsx",
+    "src/components/conversion/consumer-hub.css",
+    "src/components/conversion/PropertySearch.jsx"
+  ],
+  "accountHubRelease": "2026-11-01"
+}
